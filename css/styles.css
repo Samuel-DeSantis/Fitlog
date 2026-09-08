@@ -1,0 +1,673 @@
+/* ---------------------------------------------
+   Tokens
+   A personal training ledger: iron, paper, chalk.
+   No gradients, no shadows-as-decoration, no
+   gamified color coding. Hairline rules carry
+   structure; a single accent carries emphasis.
+--------------------------------------------- */
+:root {
+  --color-bg: #F6F7F5;
+  --color-surface: #FFFFFF;
+  --color-border: #E1E4DF;
+  --color-border-strong: #C7CBC3;
+  --color-text: #1B1E1C;
+  --color-text-muted: #6B6F69;
+  --color-text-faint: #9BA098;
+  --color-accent: #2E4B5E;
+  --color-accent-soft: #E6ECEE;
+  --color-danger: #8C4636;
+  --color-danger-soft: #F2E7E3;
+
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, monospace;
+
+  --radius-card: 10px;
+  --radius-control: 8px;
+  --radius-pill: 999px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --nav-height: 64px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+button, input, textarea {
+  font-family: inherit;
+  color: inherit;
+}
+
+button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------
+   App shell
+--------------------------------------------- */
+.app-content {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4) calc(var(--nav-height) + var(--space-6));
+  min-height: 100vh;
+}
+
+.view-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.view-header h1 {
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.view-subhead {
+  margin: 2px 0 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.back-btn {
+  font-size: 15px;
+  color: var(--color-accent);
+  font-weight: 550;
+  padding: 0;
+  margin-bottom: var(--space-2);
+  display: block;
+}
+
+.section {
+  margin-bottom: var(--space-6);
+}
+
+.section h2 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 var(--space-3);
+  color: var(--color-text);
+}
+
+.section-note {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-3);
+}
+
+.empty-hint {
+  color: var(--color-text-muted);
+  font-size: 14px;
+  padding: var(--space-3) 0;
+  margin: 0;
+}
+
+/* ---------------------------------------------
+   Bottom nav + FAB
+--------------------------------------------- */
+.nav-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: var(--nav-height);
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  align-items: stretch;
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 10;
+}
+
+.nav-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: var(--color-text-faint);
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.nav-tab.active {
+  color: var(--color-accent);
+}
+
+.nav-spacer {
+  width: 56px;
+  flex: none;
+}
+
+.fab {
+  position: fixed;
+  bottom: calc(var(--nav-height) - 28px + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(27, 30, 28, 0.22);
+  z-index: 11;
+}
+
+.fab:active {
+  transform: translateX(-50%) scale(0.94);
+}
+
+/* ---------------------------------------------
+   Cards
+--------------------------------------------- */
+.card-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.metric-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: var(--space-4);
+  width: 100%;
+}
+
+.metric-label {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin-bottom: 2px;
+}
+
+.metric-value {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.metric-delta {
+  font-size: 13px;
+  color: var(--color-accent);
+  margin-top: 4px;
+}
+
+.metric-delta.muted {
+  color: var(--color-text-muted);
+}
+
+.sparkline {
+  width: 100%;
+  height: 40px;
+  margin-top: var(--space-2);
+}
+
+.sparkline path {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sparkline-lg {
+  width: 100%;
+  height: 70px;
+  margin-top: var(--space-3);
+}
+
+.sparkline-lg path {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.workout-card {
+  background: var(--color-accent-soft);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.workout-card .btn-primary {
+  width: 100%;
+  margin-top: var(--space-3);
+}
+
+.stat-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.stat {
+  flex: 1;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat-value {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+/* ---------------------------------------------
+   List rows (ledger style — hairline, no card box)
+--------------------------------------------- */
+.list-card {
+  display: block;
+  width: 100%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: var(--space-4);
+  margin-bottom: var(--space-2);
+}
+
+.list-card-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.list-card-sub {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+.progress-card {
+  display: block;
+  width: 100%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: var(--space-4);
+}
+
+.progress-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.progress-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.progress-row:last-child {
+  border-bottom: none;
+}
+
+.progress-row-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.progress-row-sub {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+  font-family: var(--font-mono);
+}
+
+.progress-row-right {
+  text-align: right;
+}
+
+.progress-row-value {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.progress-row-delta {
+  font-size: 12px;
+  color: var(--color-accent);
+  margin-top: 2px;
+}
+
+.history-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+  gap: var(--space-3);
+}
+
+.history-row:last-child {
+  border-bottom: none;
+}
+
+.history-date {
+  font-size: 14px;
+  font-weight: 600;
+  flex: none;
+  width: 84px;
+}
+
+.history-detail {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--color-text-muted);
+  text-align: right;
+  flex: 1;
+}
+
+/* ---------------------------------------------
+   Buttons
+--------------------------------------------- */
+.btn-primary {
+  display: block;
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 13px var(--space-4);
+  border-radius: var(--radius-pill);
+  text-align: center;
+}
+
+.btn-primary:active { opacity: 0.85; }
+
+.btn-secondary {
+  display: block;
+  width: 100%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 600;
+  padding: 12px var(--space-4);
+  border-radius: var(--radius-pill);
+  text-align: center;
+  margin-bottom: var(--space-3);
+}
+
+.btn-text {
+  display: block;
+  width: 100%;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  padding: var(--space-2);
+}
+
+/* ---------------------------------------------
+   Workout logging
+--------------------------------------------- */
+.exercise-block {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.exercise-name {
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.exercise-previous {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+  margin-bottom: var(--space-3);
+}
+
+.set-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.set-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.set-index {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--color-text-faint);
+  width: 16px;
+  flex: none;
+}
+
+.set-row input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 16px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  padding: 9px var(--space-2);
+  background: var(--color-bg);
+}
+
+.set-x {
+  color: var(--color-text-faint);
+  flex: none;
+}
+
+.set-remove {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-faint);
+  font-size: 18px;
+  border-radius: 50%;
+}
+
+.btn-add-set {
+  margin-top: var(--space-3);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+#add-exercise-btn {
+  margin-bottom: var(--space-3);
+}
+
+#finish-workout-btn {
+  margin-bottom: var(--space-2);
+}
+
+/* ---------------------------------------------
+   Modal sheet (exercise picker, quick log)
+--------------------------------------------- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(27, 30, 28, 0.4);
+  display: flex;
+  align-items: flex-end;
+  z-index: 20;
+}
+
+.modal-sheet {
+  background: var(--color-surface);
+  width: 100%;
+  max-height: 82vh;
+  overflow-y: auto;
+  border-radius: 16px 16px 0 0;
+  padding: var(--space-4) var(--space-4) calc(var(--space-6) + env(safe-area-inset-bottom));
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.modal-header h2 {
+  font-size: 18px;
+  margin: 0;
+}
+
+.modal-close {
+  font-size: 22px;
+  color: var(--color-text-muted);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-search {
+  width: 100%;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  padding: 10px var(--space-3);
+  font-size: 15px;
+  margin-bottom: var(--space-3);
+  background: var(--color-bg);
+}
+
+.modal-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.modal-list-sub {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.quicklog-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.quicklog-option {
+  padding: var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.quicklog-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.quicklog-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.quicklog-form input,
+.quicklog-form textarea {
+  font-size: 16px;
+  color: var(--color-text);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  padding: 10px var(--space-3);
+  background: var(--color-bg);
+}
+
+.quicklog-form .btn-primary {
+  margin-top: var(--space-2);
+  border: none;
+  width: 100%;
+}
+
+/* ---------------------------------------------
+   Settings
+--------------------------------------------- */
+.segmented {
+  display: flex;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  width: fit-content;
+}
+
+.segmented-btn {
+  padding: 8px var(--space-5);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.segmented-btn.active {
+  background: var(--color-accent);
+  color: #fff;
+}
