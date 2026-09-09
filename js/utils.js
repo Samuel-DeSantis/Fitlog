@@ -10,18 +10,31 @@ App.utils = (function () {
     });
   }
 
-  function todayISO() {
-    return new Date().toISOString().slice(0, 10);
+  function pad2(n) {
+    return String(n).padStart(2, '0');
   }
 
-  function nowISO() {
-    return new Date().toISOString();
+  // Local calendar date as YYYY-MM-DD. Deliberately NOT toISOString(),
+  // which reports UTC and mislabels the date near midnight for anyone
+  // outside UTC.
+  function localISOFromDate(d) {
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+
+  function todayLocalISO() {
+    return localISOFromDate(new Date());
   }
 
   function daysAgoISO(n) {
     const d = new Date();
     d.setDate(d.getDate() - n);
-    return d.toISOString().slice(0, 10);
+    return localISOFromDate(d);
+  }
+
+  // Full timestamp — fine for createdAt/updatedAt (exact instants), just
+  // never used for calendar-date comparisons.
+  function nowISO() {
+    return new Date().toISOString();
   }
 
   function formatDateLabel(dateStr) {
@@ -69,5 +82,10 @@ App.utils = (function () {
     return t.content.firstElementChild;
   }
 
-  return { uuid, todayISO, nowISO, daysAgoISO, formatDateLabel, estimate1RM, sparklinePath, debounce, el };
+  return {
+    uuid, todayLocalISO, daysAgoISO, nowISO, localISOFromDate,
+    formatDateLabel, estimate1RM, sparklinePath, debounce, el
+  };
 })();
+
+if (typeof module !== 'undefined' && module.exports) module.exports = App.utils;

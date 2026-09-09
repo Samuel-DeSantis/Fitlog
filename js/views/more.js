@@ -4,9 +4,7 @@ App.views = App.views || {};
 (function () {
   App.views.more = async function (container) {
     const settings = (await App.db.get('settings', 'app')) || { id: 'app', unit: 'lb' };
-    const exercises = (await App.db.getAll('exercises'))
-      .filter(e => !e.archived)
-      .sort((a, b) => a.name.localeCompare(b.name));
+    const exercises = (await App.queries.getExercises()).sort((a, b) => a.name.localeCompare(b.name));
 
     container.innerHTML = `
       <div class="view-header"><h1>More</h1></div>
@@ -24,13 +22,14 @@ App.views = App.views || {};
         <p class="section-note">Everything is stored locally on this device only. Back up regularly.</p>
         <button class="list-card" id="export-btn">
           <div class="list-card-title">Export Data</div>
-          <div class="list-card-sub">Download a JSON backup</div>
+          <div class="list-card-sub">Download a versioned JSON backup</div>
         </button>
         <button class="list-card" id="import-btn">
           <div class="list-card-title">Import Data</div>
           <div class="list-card-sub">Restore from a JSON backup</div>
         </button>
         <input type="file" id="import-file" accept="application/json" hidden>
+        <div id="import-errors"></div>
       </div>
 
       <div class="section">
@@ -39,7 +38,10 @@ App.views = App.views || {};
           ${exercises.map(e => `
             <div class="history-row">
               <div class="history-date">${e.name}</div>
-              <div class="history-detail">${e.category}</div>
+              <div class="history-detail">
+                ${e.category}
+                <button class="archive-btn" data-id="${e.id}">Archive</button>
+              </div>
             </div>
           `).join('')}
         </div>
@@ -49,8 +51,7 @@ App.views = App.views || {};
 
     container.querySelectorAll('.segmented-btn').forEach((btn) => {
       btn.addEventListener('click', async () => {
-        settings.unit = btn.dataset.unit;
-        await App.db.put('settings', settings);
+        await App.commands.setUnit(btn.dataset.unit);
         App.views.more(container);
       });
     });
@@ -61,7 +62,7 @@ App.views = App.views || {};
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'fitlog-backup-' + App.utils.todayISO() + '.json';
+      a.download = 'fitlog-backup-' + App.utils.todayLocalISO() + '.json';
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -69,8 +70,10 @@ App.views = App.views || {};
     });
 
     const fileInput = container.querySelector('#import-file');
+    const errorsEl = container.querySelector('#import-errors');
     container.querySelector('#import-btn').addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', async () => {
+      errorsEl.innerHTML = '';
       const file = fileInput.files[0];
       if (!file) return;
       const text = await file.text();
@@ -78,27 +81,33 @@ App.views = App.views || {};
       try {
         data = JSON.parse(text);
       } catch (e) {
-        alert('That file is not valid JSON.');
+        errorsEl.innerHTML = '<p class="section-note">That file is not valid JSON.</p>';
         return;
       }
       const replace = confirm('Import and replace all existing data?\n\nOK = replace everything\nCancel = merge with existing data');
-      await App.db.importAll(data, replace ? 'replace' : 'merge');
-      alert('Import complete.');
-      App.views.more(container);
+      try {
+        await App.db.importAll(data, replace ? 'replace' : 'merge');
+        alert('Import complete.');
+        App.views.more(container);
+      } catch (err) {
+        const details = (err.details || []).slice(0, 6).map(d => `<div>${d}</div>`).join('');
+        errorsEl.innerHTML = `<p class="section-note">Import rejected — nothing was changed.${details}</p>`;
+      }
+    });
+
+    container.querySelectorAll('.archive-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Archive this exercise? Past workouts that use it are unaffected — it just won\'t show up when adding new exercises.')) return;
+        await App.commands.archiveExercise(btn.dataset.id);
+        App.views.more(container);
+      });
     });
 
     container.querySelector('#add-exercise-btn').addEventListener('click', () => {
       const name = prompt('Exercise name');
       if (!name) return;
       const category = prompt('Category (e.g. Chest, Back, Legs)') || 'Other';
-      App.db.put('exercises', {
-        id: App.utils.uuid(),
-        name,
-        category,
-        equipment: '',
-        archived: false,
-        createdAt: App.utils.nowISO()
-      }).then(() => App.views.more(container));
+      App.commands.createExercise(name, category).then(() => App.views.more(container));
     });
   };
 })();

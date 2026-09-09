@@ -3,19 +3,19 @@ App.views = App.views || {};
 
 (function () {
   App.views.train = async function (container) {
-    const workouts = await App.db.getAll('workouts');
-    const active = workouts.find(w => !w.endedAt);
+    const active = await App.queries.getActiveWorkout();
     if (active) {
       await renderActiveWorkout(container, active);
     } else {
-      await renderStart(container, workouts);
+      await renderStart(container);
     }
   };
 
-  async function renderStart(container, workouts) {
-    const templates = await App.db.getAll('templates');
-    const completed = workouts.filter(w => w.endedAt).sort((a, b) => b.date.localeCompare(a.date));
-    const last = completed[0];
+  async function renderStart(container) {
+    const [last, templates] = await Promise.all([
+      App.queries.getLatestCompletedWorkout(),
+      App.queries.getTemplates()
+    ]);
 
     container.innerHTML = `
       <div class="view-header"><h1>Train</h1></div>
@@ -23,7 +23,7 @@ App.views = App.views || {};
         ${last ? `
           <button class="list-card" id="repeat-last">
             <div class="list-card-title">Repeat ${last.title || 'Last Workout'}</div>
-            <div class="list-card-sub">Last done ${App.utils.formatDateLabel(last.date)}</div>
+            <div class="list-card-sub">Last done ${App.utils.formatDateLabel(last.date)} · structure only, no numbers copied</div>
           </button>
         ` : ''}
         ${templates.map(t => `
@@ -40,78 +40,43 @@ App.views = App.views || {};
     `;
 
     if (last) {
-      container.querySelector('#repeat-last').addEventListener('click', async () => {
-        const allSets = await App.db.getAll('sets');
-        const lastSets = allSets.filter(s => s.workoutId === last.id).sort((a, b) => a.setIndex - b.setIndex);
-        const exerciseIds = [...new Set(lastSets.map(s => s.exerciseId))];
-        await startWorkout(last.title, exerciseIds);
+      container.querySelector('#repeat-last').addEventListener('click', async (e) => {
+        e.currentTarget.disabled = true;
+        await App.commands.repeatLastWorkout();
         App.router.render();
       });
     }
-
     container.querySelectorAll('[data-template]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', async (e) => {
+        e.currentTarget.disabled = true;
         const t = templates.find(tt => tt.id === btn.dataset.template);
-        const exerciseIds = [...t.exercises].sort((a, b) => a.order - b.order).map(e => e.exerciseId);
-        await startWorkout(t.name, exerciseIds);
+        await App.commands.startFromTemplate(t);
         App.router.render();
       });
     });
-
-    container.querySelector('#new-workout').addEventListener('click', async () => {
-      await startWorkout('Workout', []);
+    container.querySelector('#new-workout').addEventListener('click', async (e) => {
+      e.currentTarget.disabled = true;
+      await App.commands.startWorkout('Workout', []);
       App.router.render();
     });
   }
 
-  async function startWorkout(title, exerciseIds) {
-    const workout = {
-      id: App.utils.uuid(),
-      date: App.utils.todayISO(),
-      title,
-      templateId: null,
-      notes: '',
-      startedAt: App.utils.nowISO(),
-      endedAt: null,
-      createdAt: App.utils.nowISO(),
-      updatedAt: App.utils.nowISO(),
-      exerciseOrder: exerciseIds
-    };
-    await App.db.put('workouts', workout);
-    return workout;
-  }
-
   async function renderActiveWorkout(container, workout) {
-    const [allSets, allExercises, allWorkouts] = await Promise.all([
-      App.db.getAll('sets'),
-      App.db.getAll('exercises'),
-      App.db.getAll('workouts')
+    const [exercises, workoutExercises] = await Promise.all([
+      App.queries.getExercises(true),
+      App.queries.getWorkoutExercises(workout.id)
     ]);
-    const exerciseMap = Object.fromEntries(allExercises.map(e => [e.id, e]));
-    const wMap = Object.fromEntries(allWorkouts.map(w => [w.id, w]));
-    const currentSets = allSets.filter(s => s.workoutId === workout.id);
-
-    function previousSetsFor(exerciseId) {
-      const prior = allSets.filter(s => s.exerciseId === exerciseId && s.workoutId !== workout.id);
-      if (!prior.length) return null;
-      const byWorkout = {};
-      prior.forEach(s => { (byWorkout[s.workoutId] = byWorkout[s.workoutId] || []).push(s); });
-      const workoutIds = Object.keys(byWorkout)
-        .sort((a, b) => (wMap[b] && wMap[b].date || '').localeCompare(wMap[a] && wMap[a].date || ''));
-      return byWorkout[workoutIds[0]].sort((a, b) => a.setIndex - b.setIndex);
-    }
-
-    const exerciseIds = (workout.exerciseOrder && workout.exerciseOrder.length)
-      ? workout.exerciseOrder
-      : [...new Set(currentSets.map(s => s.exerciseId))];
+    const exerciseMap = Object.fromEntries(exercises.map(e => [e.id, e]));
 
     let blocksHtml = '';
-    for (const exId of exerciseIds) {
-      const ex = exerciseMap[exId];
+    for (const we of workoutExercises) {
+      const ex = exerciseMap[we.exerciseId];
       if (!ex) continue;
-      const prevSets = previousSetsFor(exId);
-      const mySets = currentSets.filter(s => s.exerciseId === exId).sort((a, b) => a.setIndex - b.setIndex);
-      blocksHtml += exerciseBlockHtml(ex, prevSets, mySets);
+      const [mySets, prevSets] = await Promise.all([
+        App.queries.getSetsForWorkoutExercise(we.id),
+        App.queries.getPreviousPerformance(we.exerciseId, workout.id)
+      ]);
+      blocksHtml += exerciseBlockHtml(we, ex, prevSets, mySets);
     }
 
     container.innerHTML = `
@@ -127,97 +92,101 @@ App.views = App.views || {};
       <button class="btn-text" id="cancel-workout-btn">Cancel Workout</button>
     `;
 
-    wireExerciseBlocks(container, workout);
+    wireBlocks(container, workout);
 
     container.querySelector('#add-exercise-btn').addEventListener('click', () => {
       openExercisePicker(async (ex) => {
-        workout.exerciseOrder = [...(workout.exerciseOrder || []), ex.id];
-        workout.updatedAt = App.utils.nowISO();
-        await App.db.put('workouts', workout);
+        await App.commands.addExerciseToWorkout(workout.id, ex.id);
         App.router.render();
       });
     });
 
     container.querySelector('#finish-workout-btn').addEventListener('click', async () => {
-      workout.endedAt = App.utils.nowISO();
-      workout.updatedAt = App.utils.nowISO();
-      await App.db.put('workouts', workout);
+      await App.commands.finishWorkout(workout.id);
       App.router.go('/today');
     });
 
     container.querySelector('#cancel-workout-btn').addEventListener('click', async () => {
-      if (!confirm('Discard this workout? Logged sets will be deleted.')) return;
-      const sets = (await App.db.getAll('sets')).filter(s => s.workoutId === workout.id);
-      for (const s of sets) await App.db.remove('sets', s.id);
-      await App.db.remove('workouts', workout.id);
+      if (!confirm('Discard this workout? Everything logged will be deleted.')) return;
+      await App.commands.cancelWorkout(workout.id);
       App.router.go('/today');
     });
   }
 
-  function exerciseBlockHtml(ex, prevSets, mySets) {
+  function exerciseBlockHtml(we, ex, prevSets, mySets) {
+    const prevHtml = prevSets ? prevSets.map((s, i) => `
+      <div class="prev-set-row">
+        <span>${s.weight}×${s.reps}</span>
+        <button class="prev-copy-btn" data-copy-weight="${s.weight}" data-copy-reps="${s.reps}">Copy</button>
+      </div>
+    `).join('') : '<p class="empty-hint" style="padding:4px 0">No history yet</p>';
+
     const rows = mySets.map((s, i) => setRowHtml(s, i)).join('');
-    const prevText = prevSets ? prevSets.map(s => `${s.weight}×${s.reps}`).join(', ') : 'No history yet';
+
     return `
-      <div class="exercise-block" data-exercise="${ex.id}">
-        <div class="exercise-name">${ex.name}</div>
-        <div class="exercise-previous">Previous: ${prevText}</div>
+      <div class="exercise-block" data-we="${we.id}" data-exercise="${ex.id}">
+        <div class="exercise-block-header">
+          <div class="exercise-name">${ex.name}</div>
+          <button class="exercise-remove" data-we="${we.id}" aria-label="Remove exercise">Remove</button>
+        </div>
+        <div class="exercise-previous">
+          <div class="exercise-previous-label">Previous</div>
+          ${prevHtml}
+        </div>
         <div class="set-rows">${rows}</div>
-        <button class="btn-add-set" data-exercise="${ex.id}">+ Add Set</button>
+        <button class="btn-add-set" data-we="${we.id}">+ Add Set</button>
       </div>
     `;
   }
 
   function setRowHtml(set, index) {
+    const complete = App.commands.isSetCompleted(set);
     return `
-      <div class="set-row" data-set="${set.id}">
+      <div class="set-row ${complete ? 'set-row-complete' : 'set-row-planned'}" data-set="${set.id}">
         <span class="set-index">${index + 1}</span>
         <input type="number" inputmode="decimal" class="set-weight" value="${set.weight != null ? set.weight : ''}" placeholder="wt">
         <span class="set-x">×</span>
         <input type="number" inputmode="numeric" class="set-reps" value="${set.reps != null ? set.reps : ''}" placeholder="reps">
+        <span class="set-check">${complete ? '✓' : ''}</span>
         <button class="set-remove" aria-label="Remove set">×</button>
       </div>
     `;
   }
 
-  function wireExerciseBlocks(container, workout) {
+  function wireBlocks(container, workout) {
     container.querySelectorAll('.btn-add-set').forEach((btn) => {
       btn.addEventListener('click', async () => {
-        const exId = btn.dataset.exercise;
+        const weId = btn.dataset.we;
+        const we = await App.db.get('workoutExercises', weId);
+        const newSet = await App.commands.addEmptySet(we);
         const block = btn.closest('.exercise-block');
-        const existingRows = block.querySelectorAll('.set-row').length;
-
-        const allSets = await App.db.getAll('sets');
-        const mySets = allSets.filter(s => s.workoutId === workout.id && s.exerciseId === exId);
-        let suggestWeight = null, suggestReps = null;
-        if (mySets.length) {
-          const lastRow = [...mySets].sort((a, b) => a.setIndex - b.setIndex).slice(-1)[0];
-          suggestWeight = lastRow.weight;
-          suggestReps = lastRow.reps;
-        } else {
-          const priorAll = allSets.filter(s => s.exerciseId === exId && s.workoutId !== workout.id);
-          if (priorAll.length) {
-            const workoutsAll = await App.db.getAll('workouts');
-            const wMap = Object.fromEntries(workoutsAll.map(w => [w.id, w]));
-            priorAll.sort((a, b) => (wMap[b.workoutId] && wMap[b.workoutId].date || '').localeCompare(wMap[a.workoutId] && wMap[a.workoutId].date || ''));
-            suggestWeight = priorAll[0].weight;
-            suggestReps = priorAll[0].reps;
-          }
-        }
-
-        const newSet = {
-          id: App.utils.uuid(),
-          workoutId: workout.id,
-          exerciseId: exId,
-          setIndex: existingRows,
-          weight: suggestWeight,
-          reps: suggestReps,
-          rpe: null,
-          completedAt: App.utils.nowISO()
-        };
-        await App.db.put('sets', newSet);
-        const row = App.utils.el(setRowHtml(newSet, existingRows));
+        const index = block.querySelectorAll('.set-row').length;
+        const row = App.utils.el(setRowHtml(newSet, index));
         block.querySelector('.set-rows').appendChild(row);
         wireSetRow(row);
+      });
+    });
+
+    container.querySelectorAll('.prev-copy-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const block = btn.closest('.exercise-block');
+        const weId = block.dataset.we;
+        const we = await App.db.get('workoutExercises', weId);
+        const weight = parseFloat(btn.dataset.copyWeight);
+        const reps = parseInt(btn.dataset.copyReps, 10);
+        const newSet = await App.commands.copyPreviousToNewSet(we, { weight, reps });
+        const index = block.querySelectorAll('.set-row').length;
+        const row = App.utils.el(setRowHtml(newSet, index));
+        block.querySelector('.set-rows').appendChild(row);
+        wireSetRow(row);
+      });
+    });
+
+    container.querySelectorAll('.exercise-remove').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Remove this exercise and its logged sets from this workout?')) return;
+        await App.commands.removeExerciseFromWorkout(btn.dataset.we);
+        App.router.render();
       });
     });
 
@@ -229,32 +198,33 @@ App.views = App.views || {};
     const weightInput = row.querySelector('.set-weight');
     const repsInput = row.querySelector('.set-reps');
     const removeBtn = row.querySelector('.set-remove');
+    const checkEl = row.querySelector('.set-check');
 
     const save = App.utils.debounce(async () => {
-      const set = await App.db.get('sets', setId);
-      if (!set) return;
-      set.weight = weightInput.value !== '' ? parseFloat(weightInput.value) : null;
-      set.reps = repsInput.value !== '' ? parseInt(repsInput.value, 10) : null;
-      await App.db.put('sets', set);
+      const weight = weightInput.value !== '' ? parseFloat(weightInput.value) : null;
+      const reps = repsInput.value !== '' ? parseInt(repsInput.value, 10) : null;
+      const updated = await App.commands.updateSet(setId, { weight, reps });
+      const complete = App.commands.isSetCompleted(updated);
+      row.classList.toggle('set-row-complete', complete);
+      row.classList.toggle('set-row-planned', !complete);
+      checkEl.textContent = complete ? '✓' : '';
     }, 300);
 
     weightInput.addEventListener('input', save);
     repsInput.addEventListener('input', save);
 
     removeBtn.addEventListener('click', async () => {
-      await App.db.remove('sets', setId);
+      await App.commands.deleteSet(setId);
       row.remove();
     });
   }
 
   async function openExercisePicker(onSelect) {
-    const exercises = (await App.db.getAll('exercises'))
-      .filter(e => !e.archived)
-      .sort((a, b) => a.name.localeCompare(b.name));
+    const exercises = (await App.queries.getExercises()).sort((a, b) => a.name.localeCompare(b.name));
 
     const overlay = App.utils.el(`
       <div class="modal-overlay">
-        <div class="modal-sheet">
+        <div class="modal-sheet modal-sheet-search">
           <div class="modal-header">
             <h2>Add Exercise</h2>
             <button class="modal-close">×</button>

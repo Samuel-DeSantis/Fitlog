@@ -32,7 +32,7 @@
   --space-5: 24px;
   --space-6: 32px;
 
-  --nav-height: 64px;
+  --nav-height: 80px;
 }
 
 * { box-sizing: border-box; }
@@ -61,6 +61,11 @@ button {
   border: none;
   cursor: pointer;
   text-align: left;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -158,10 +163,16 @@ button {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 5px;
   color: var(--color-text-faint);
-  font-size: 11px;
-  font-weight: 550;
+  font-size: 13px;
+  font-weight: 600;
+  min-height: 100%;
+}
+
+.nav-tab svg {
+  width: 26px;
+  height: 26px;
 }
 
 .nav-tab.active {
@@ -411,6 +422,13 @@ button {
   flex: 1;
 }
 
+.archive-btn {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--color-danger);
+  margin-left: var(--space-3);
+}
+
 /* ---------------------------------------------
    Buttons
 --------------------------------------------- */
@@ -461,17 +479,56 @@ button {
   margin-bottom: var(--space-3);
 }
 
+.exercise-block-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
 .exercise-name {
   font-size: 16px;
   font-weight: 650;
 }
 
+.exercise-remove {
+  font-size: 12px;
+  color: var(--color-text-faint);
+  flex: none;
+}
+
 .exercise-previous {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  color: var(--color-text-muted);
   margin-top: 2px;
   margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg);
+  border-radius: var(--radius-control);
+}
+
+.exercise-previous-label {
+  font-size: 11px;
+  color: var(--color-text-faint);
+  margin-bottom: 2px;
+}
+
+.prev-set-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--color-text-muted);
+  padding: 3px 0;
+}
+
+.prev-copy-btn {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-accent);
+  padding: 2px 8px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
 }
 
 .set-rows {
@@ -484,6 +541,22 @@ button {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  border-radius: var(--radius-control);
+  transition: none;
+}
+
+.set-row-planned .set-weight,
+.set-row-planned .set-reps {
+  border-style: dashed;
+  color: var(--color-text-muted);
+}
+
+.set-check {
+  width: 16px;
+  flex: none;
+  text-align: center;
+  color: var(--color-accent);
+  font-size: 15px;
 }
 
 .set-index {
@@ -556,6 +629,24 @@ button {
   overflow-y: auto;
   border-radius: 16px 16px 0 0;
   padding: var(--space-4) var(--space-4) calc(var(--space-6) + env(safe-area-inset-bottom));
+}
+
+/* Used for sheets with a search field + variable-length results (the
+   exercise picker). Fixed height so the search input never moves as the
+   result count changes — only the list below it grows/shrinks, and it
+   scrolls independently instead of resizing the whole sheet. */
+.modal-sheet-search {
+  height: 78vh;
+  max-height: 78vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-sheet-search .modal-list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .modal-header {

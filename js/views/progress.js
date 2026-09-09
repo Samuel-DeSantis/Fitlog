@@ -13,33 +13,22 @@ App.views = App.views || {};
   };
 
   async function renderList(container) {
-    const [exercises, sets, workouts, bwLogs] = await Promise.all([
-      App.db.getAll('exercises'),
-      App.db.getAll('sets'),
-      App.db.getAll('workouts'),
-      App.db.getAll('bodyweightLogs')
-    ]);
-    const wMap = Object.fromEntries(workouts.map(w => [w.id, w]));
-    const byExercise = {};
-    sets.forEach((s) => {
-      const w = wMap[s.workoutId];
-      if (!w || !w.endedAt) return;
-      (byExercise[s.exerciseId] = byExercise[s.exerciseId] || []).push({ ...s, date: w.date });
-    });
+    const exercises = await App.queries.getExercises(true);
+    const rows = [];
 
-    const rows = Object.keys(byExercise).map((exId) => {
-      const ex = exercises.find(e => e.id === exId);
-      if (!ex) return null;
-      const list = byExercise[exId].sort((a, b) => a.date.localeCompare(b.date));
-      const last = list[list.length - 1];
-      const best1RM = Math.max(...list.map(s => App.utils.estimate1RM(s.weight, s.reps)));
-      const eightWeeksAgo = App.utils.daysAgoISO(56);
-      const oldEntry = list.find(s => s.date >= eightWeeksAgo);
-      const old1RM = oldEntry ? App.utils.estimate1RM(oldEntry.weight, oldEntry.reps) : null;
-      const pctChange = (old1RM && old1RM > 0) ? Math.round(((best1RM - old1RM) / old1RM) * 100) : null;
-      return { ex, last, best1RM, pctChange };
-    }).filter(Boolean).sort((a, b) => b.last.date.localeCompare(a.last.date));
+    for (const ex of exercises) {
+      const history = await App.queries.getExerciseHistory(ex.id);
+      if (!history.length) continue;
+      const allSets = history.flatMap(h => h.sets);
+      const best = App.analytics.bestRecordedSet(allSets);
+      const best1RM = App.analytics.bestEstimated1RM(allSets);
+      const cmp = App.analytics.periodComparison(history, 30, App.analytics.bestEstimated1RM);
+      rows.push({ ex, lastDate: history[0].workout.date, best, best1RM, cmp });
+    }
 
+    rows.sort((a, b) => b.lastDate.localeCompare(a.lastDate));
+
+    const bwLogs = await App.queries.getBodyweightForRange('0000-01-01', App.utils.todayLocalISO());
     bwLogs.sort((a, b) => a.date.localeCompare(b.date));
     const bwSpark = App.utils.sparklinePath(bwLogs.slice(-30).map(l => l.weight), 280, 60);
 
@@ -56,12 +45,12 @@ App.views = App.views || {};
         ${rows.length ? rows.map(r => `
           <button class="progress-row" data-id="${r.ex.id}">
             <div>
-              <div class="progress-row-title">${r.ex.name}</div>
-              <div class="progress-row-sub">${r.last.weight}×${r.last.reps} · last ${App.utils.formatDateLabel(r.last.date)}</div>
+              <div class="progress-row-title">${r.ex.name}${r.ex.archived ? ' <span class="empty-hint" style="display:inline">(archived)</span>' : ''}</div>
+              <div class="progress-row-sub">Best: ${r.best.weight}×${r.best.reps} · ${App.utils.formatDateLabel(r.lastDate)}</div>
             </div>
             <div class="progress-row-right">
               <div class="progress-row-value">~${r.best1RM} 1RM</div>
-              ${r.pctChange != null ? `<div class="progress-row-delta">${r.pctChange >= 0 ? '+' : ''}${r.pctChange}%</div>` : ''}
+              ${r.cmp.hasComparison ? `<div class="progress-row-delta">${r.cmp.pctChange >= 0 ? '+' : ''}${r.cmp.pctChange}% / 30d</div>` : ''}
             </div>
           </button>
         `).join('') : '<p class="empty-hint">Finish a workout to see progress here.</p>'}
@@ -75,38 +64,24 @@ App.views = App.views || {};
   }
 
   async function renderExerciseDetail(container, exId) {
-    const [ex, sets, workouts] = await Promise.all([
+    const [ex, history] = await Promise.all([
       App.db.get('exercises', exId),
-      App.db.getAll('sets'),
-      App.db.getAll('workouts')
+      App.queries.getExerciseHistory(exId)
     ]);
-    const wMap = Object.fromEntries(workouts.map(w => [w.id, w]));
-    const mySets = sets
-      .filter(s => s.exerciseId === exId)
-      .map(s => ({ ...s, date: wMap[s.workoutId] && wMap[s.workoutId].date }))
-      .filter(s => s.date && wMap[s.workoutId].endedAt)
-      .sort((a, b) => a.date.localeCompare(b.date));
-
-    const best = mySets.reduce((acc, s) => {
-      if (!acc) return s;
-      if (s.weight > acc.weight || (s.weight === acc.weight && s.reps > acc.reps)) return s;
-      return acc;
-    }, null);
-    const best1RM = mySets.length ? Math.max(...mySets.map(s => App.utils.estimate1RM(s.weight, s.reps))) : 0;
+    const allSets = history.flatMap(h => h.sets);
+    const best = App.analytics.bestRecordedSet(allSets);
+    const best1RM = App.analytics.bestEstimated1RM(allSets);
+    const cmp30 = App.analytics.periodComparison(history, 30, App.analytics.bestEstimated1RM);
 
     const byDate1RM = {};
-    mySets.forEach((s) => {
-      const v = App.utils.estimate1RM(s.weight, s.reps);
-      if (!byDate1RM[s.date] || v > byDate1RM[s.date]) byDate1RM[s.date] = v;
+    history.forEach(({ workout, sets }) => {
+      const v = App.analytics.bestEstimated1RM(sets);
+      if (!byDate1RM[workout.date] || v > byDate1RM[workout.date]) byDate1RM[workout.date] = v;
     });
     const dates = Object.keys(byDate1RM).sort();
     const spark = App.utils.sparklinePath(dates.map(d => byDate1RM[d]), 280, 70);
 
-    const byWorkout = {};
-    mySets.forEach((s) => { (byWorkout[s.workoutId] = byWorkout[s.workoutId] || []).push(s); });
-    const recentWorkoutIds = Object.keys(byWorkout)
-      .sort((a, b) => (wMap[b].date).localeCompare(wMap[a].date))
-      .slice(0, 10);
+    const recent = history.slice(0, 10);
 
     container.innerHTML = `
       <div class="view-header">
@@ -117,24 +92,20 @@ App.views = App.views || {};
       </div>
       <div class="section">
         <div class="metric-card">
-          <div class="metric-label">Current best</div>
+          <div class="metric-label">Best recorded</div>
           <div class="metric-value">${best ? best.weight + '×' + best.reps : '—'}</div>
-          <div class="metric-delta muted">Estimated 1RM ${best1RM ? '~' + best1RM : '—'}</div>
+          <div class="metric-delta muted">Estimated 1RM ${best1RM ? '~' + best1RM : '—'}${cmp30.hasComparison ? ` · ${cmp30.pctChange >= 0 ? '+' : ''}${cmp30.pctChange}% vs. prior 30 days` : ''}</div>
         </div>
         ${spark ? `<svg class="sparkline-lg" viewBox="0 0 280 70"><path d="${spark}"/></svg>` : ''}
       </div>
       <div class="section">
         <h2>Recent workouts</h2>
-        ${recentWorkoutIds.length ? recentWorkoutIds.map((wid) => {
-          const w = wMap[wid];
-          const wSets = byWorkout[wid].sort((a, b) => a.setIndex - b.setIndex);
-          return `
-            <div class="history-row">
-              <div class="history-date">${App.utils.formatDateLabel(w.date)}</div>
-              <div class="history-detail">${wSets.map(s => s.weight + '×' + s.reps).join(', ')}</div>
-            </div>
-          `;
-        }).join('') : '<p class="empty-hint">No history yet</p>'}
+        ${recent.length ? recent.map(({ workout, sets }) => `
+          <div class="history-row">
+            <div class="history-date">${App.utils.formatDateLabel(workout.date)}</div>
+            <div class="history-detail">${sets.map(s => s.weight + '×' + s.reps).join(', ')}</div>
+          </div>
+        `).join('') : '<p class="empty-hint">No history yet</p>'}
       </div>
     `;
     container.querySelector('#back-btn').addEventListener('click', () => App.router.go('/progress'));
@@ -143,11 +114,12 @@ App.views = App.views || {};
   async function renderBodyweightDetail(container) {
     const settings = await App.db.get('settings', 'app');
     const unit = (settings && settings.unit) || 'lb';
-    const logs = (await App.db.getAll('bodyweightLogs')).sort((a, b) => a.date.localeCompare(b.date));
+    const logs = (await App.queries.getBodyweightForRange('0000-01-01', App.utils.todayLocalISO()))
+      .sort((a, b) => a.date.localeCompare(b.date));
     const spark = App.utils.sparklinePath(logs.map(l => l.weight), 280, 80);
     const latest = logs[logs.length - 1];
-    const d7 = [...logs].reverse().find(l => l.date <= App.utils.daysAgoISO(7));
-    const d30 = [...logs].reverse().find(l => l.date <= App.utils.daysAgoISO(30));
+    const d7 = await App.queries.getBodyweightOnOrBefore(App.utils.daysAgoISO(7));
+    const d30 = await App.queries.getBodyweightOnOrBefore(App.utils.daysAgoISO(30));
 
     container.innerHTML = `
       <div class="view-header">
@@ -159,7 +131,7 @@ App.views = App.views || {};
       <div class="section">
         <div class="metric-card">
           <div class="metric-value">${latest ? latest.weight.toFixed(1) + ' ' + unit : '—'}</div>
-          <div class="metric-delta muted">7d: ${latest && d7 ? Math.round((latest.weight - d7.weight) * 10) / 10 : '—'} · 30d: ${latest && d30 ? Math.round((latest.weight - d30.weight) * 10) / 10 : '—'}</div>
+          <div class="metric-delta muted">7d: ${latest && d7 && d7.id !== latest.id ? Math.round((latest.weight - d7.weight) * 10) / 10 : '—'} · 30d: ${latest && d30 && d30.id !== latest.id ? Math.round((latest.weight - d30.weight) * 10) / 10 : '—'}</div>
         </div>
         ${spark ? `<svg class="sparkline-lg" viewBox="0 0 280 80"><path d="${spark}"/></svg>` : '<p class="empty-hint">No entries yet</p>'}
       </div>
