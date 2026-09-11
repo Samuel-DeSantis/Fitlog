@@ -14,9 +14,10 @@ App.utils = (function () {
     return String(n).padStart(2, '0');
   }
 
-  // Local calendar date as YYYY-MM-DD. Deliberately NOT toISOString(),
+  // Local calendar date as YYYY-MM-DD. Deliberately not toISOString(),
   // which reports UTC and mislabels the date near midnight for anyone
-  // outside UTC.
+  // outside UTC. This is the one function everything else builds on for
+  // "what day is it".
   function localISOFromDate(d) {
     return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
   }
@@ -31,8 +32,8 @@ App.utils = (function () {
     return localISOFromDate(d);
   }
 
-  // Full timestamp — fine for createdAt/updatedAt (exact instants), just
-  // never used for calendar-date comparisons.
+  // Exact instant — fine for startedAt/endedAt/createdAt, never used for
+  // calendar-date comparisons.
   function nowISO() {
     return new Date().toISOString();
   }
@@ -47,25 +48,20 @@ App.utils = (function () {
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   }
 
+  function formatDateHeading(dateStr) {
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+  }
+
+  function formatTime(isoStr) {
+    if (!isoStr) return '';
+    return new Date(isoStr).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  }
+
   function estimate1RM(weight, reps) {
     if (!weight || !reps) return 0;
     if (reps === 1) return weight;
     return Math.round(weight * (1 + reps / 30) * 10) / 10;
-  }
-
-  function sparklinePath(values, width, height, pad) {
-    pad = pad == null ? 6 : pad;
-    const clean = values.filter(v => typeof v === 'number' && !isNaN(v));
-    if (clean.length < 2) return '';
-    const min = Math.min(...clean);
-    const max = Math.max(...clean);
-    const range = (max - min) || 1;
-    const step = (width - pad * 2) / (clean.length - 1);
-    return clean.map((v, i) => {
-      const x = pad + i * step;
-      const y = pad + (height - pad * 2) * (1 - (v - min) / range);
-      return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1);
-    }).join(' ');
   }
 
   function debounce(fn, ms) {
@@ -84,7 +80,7 @@ App.utils = (function () {
 
   return {
     uuid, todayLocalISO, daysAgoISO, nowISO, localISOFromDate,
-    formatDateLabel, estimate1RM, sparklinePath, debounce, el
+    formatDateLabel, formatDateHeading, formatTime, estimate1RM, debounce, el
   };
 })();
 

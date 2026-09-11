@@ -3,7 +3,7 @@ App.views = App.views || {};
 
 (function () {
   App.views.more = async function (container) {
-    const settings = (await App.db.get('settings', 'app')) || { id: 'app', unit: 'lb' };
+    const settings = await App.queries.getSettings();
     const exercises = (await App.queries.getExercises()).sort((a, b) => a.name.localeCompare(b.name));
 
     container.innerHTML = `
@@ -18,34 +18,34 @@ App.views = App.views || {};
       </div>
 
       <div class="section">
-        <h2>Your data</h2>
-        <p class="section-note">Everything is stored locally on this device only. Back up regularly.</p>
-        <button class="list-card" id="export-btn">
-          <div class="list-card-title">Export Data</div>
-          <div class="list-card-sub">Download a versioned JSON backup</div>
-        </button>
-        <button class="list-card" id="import-btn">
-          <div class="list-card-title">Import Data</div>
-          <div class="list-card-sub">Restore from a JSON backup</div>
-        </button>
-        <input type="file" id="import-file" accept="application/json" hidden>
-        <div id="import-errors"></div>
+        <h2>Bodyweight</h2>
+        <div class="modal-form" style="max-width:220px">
+          <input type="number" inputmode="decimal" id="bodyweight-input" step="0.1" value="${settings.bodyweight != null ? settings.bodyweight : ''}" placeholder="e.g. 175">
+        </div>
+        <p class="section-note">Current value only — not a tracking history yet.</p>
       </div>
 
       <div class="section">
-        <h2>Exercise library</h2>
+        <h2>Exercises</h2>
         <div id="exercise-list">
           ${exercises.map(e => `
-            <div class="history-row">
-              <div class="history-date">${e.name}</div>
-              <div class="history-detail">
-                ${e.category}
-                <button class="archive-btn" data-id="${e.id}">Archive</button>
-              </div>
+            <div class="list-row">
+              <div class="list-row-title">${e.name}</div>
+              <button class="list-row-action danger" data-archive="${e.id}">Archive</button>
             </div>
           `).join('')}
         </div>
-        <button class="btn-secondary" id="add-exercise-btn" style="margin-top: 12px">+ Add Exercise</button>
+        <button class="btn-secondary" id="add-exercise-btn" style="margin-top:12px">+ Add Exercise</button>
+      </div>
+
+      <div class="section">
+        <h2>Data</h2>
+        <p class="section-note">Everything is stored locally on this device only. Back up regularly.</p>
+        <button class="btn-secondary" id="export-btn">Export Data</button>
+        <button class="btn-secondary" id="import-btn">Import Data</button>
+        <input type="file" id="import-file" accept="application/json" hidden>
+        <button class="btn-danger" id="clear-btn">Clear All Data</button>
+        <div id="import-errors"></div>
       </div>
     `;
 
@@ -54,6 +54,26 @@ App.views = App.views || {};
         await App.commands.setUnit(btn.dataset.unit);
         App.views.more(container);
       });
+    });
+
+    const bwInput = container.querySelector('#bodyweight-input');
+    bwInput.addEventListener('change', async () => {
+      const value = bwInput.value !== '' ? parseFloat(bwInput.value) : null;
+      await App.commands.setBodyweight(value);
+    });
+
+    container.querySelectorAll('[data-archive]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Archive this exercise? Past workouts using it are unaffected — it just won\'t appear when adding new exercises.')) return;
+        await App.commands.archiveExercise(btn.dataset.archive);
+        App.views.more(container);
+      });
+    });
+
+    container.querySelector('#add-exercise-btn').addEventListener('click', () => {
+      const name = prompt('Exercise name');
+      if (!name) return;
+      App.commands.createExercise(name).then(() => App.views.more(container));
     });
 
     container.querySelector('#export-btn').addEventListener('click', async () => {
@@ -76,10 +96,9 @@ App.views = App.views || {};
       errorsEl.innerHTML = '';
       const file = fileInput.files[0];
       if (!file) return;
-      const text = await file.text();
       let data;
       try {
-        data = JSON.parse(text);
+        data = JSON.parse(await file.text());
       } catch (e) {
         errorsEl.innerHTML = '<p class="section-note">That file is not valid JSON.</p>';
         return;
@@ -95,19 +114,12 @@ App.views = App.views || {};
       }
     });
 
-    container.querySelectorAll('.archive-btn').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        if (!confirm('Archive this exercise? Past workouts that use it are unaffected — it just won\'t show up when adding new exercises.')) return;
-        await App.commands.archiveExercise(btn.dataset.id);
-        App.views.more(container);
-      });
-    });
-
-    container.querySelector('#add-exercise-btn').addEventListener('click', () => {
-      const name = prompt('Exercise name');
-      if (!name) return;
-      const category = prompt('Category (e.g. Chest, Back, Legs)') || 'Other';
-      App.commands.createExercise(name, category).then(() => App.views.more(container));
+    container.querySelector('#clear-btn').addEventListener('click', async () => {
+      if (!confirm('Delete ALL data on this device? This cannot be undone. Export a backup first if you want to keep anything.')) return;
+      await App.db.clearAll();
+      await App.ensureSeed();
+      alert('All data cleared.');
+      App.views.more(container);
     });
   };
 })();

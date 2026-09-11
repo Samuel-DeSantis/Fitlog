@@ -1,8 +1,8 @@
 {
   "name": "fitlog",
   "private": true,
-  "version": "1.0.0",
-  "description": "Local-first fitness logbook. Vanilla HTML/CSS/JS, IndexedDB, no backend.",
+  "version": "2.0.0",
+  "description": "Local-first workout tracker. Vanilla HTML/CSS/JS, IndexedDB, no backend.",
   "scripts": {
     "test": "node --test tests/*.test.js"
   },

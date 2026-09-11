@@ -1,28 +1,25 @@
 /* ---------------------------------------------
-   Tokens
-   A personal training ledger: iron, paper, chalk.
-   No gradients, no shadows-as-decoration, no
-   gamified color coding. Hairline rules carry
-   structure; a single accent carries emphasis.
+   Tokens — clean, typography-first, content over
+   chrome. Near-white surface, one restrained
+   accent, hairline dividers instead of boxed
+   cards, pill controls.
 --------------------------------------------- */
 :root {
-  --color-bg: #F6F7F5;
-  --color-surface: #FFFFFF;
-  --color-border: #E1E4DF;
-  --color-border-strong: #C7CBC3;
-  --color-text: #1B1E1C;
-  --color-text-muted: #6B6F69;
-  --color-text-faint: #9BA098;
-  --color-accent: #2E4B5E;
-  --color-accent-soft: #E6ECEE;
-  --color-danger: #8C4636;
-  --color-danger-soft: #F2E7E3;
+  --bg: #FFFFFF;
+  --surface: #FBFBFC;
+  --border: #E6E8EB;
+  --border-strong: #D3D7DC;
+  --text: #15181C;
+  --text-muted: #6E7681;
+  --text-faint: #9AA1AC;
+  --accent: #1F3A5F;
+  --accent-soft: #EAEFF5;
+  --danger: #A8402F;
+  --danger-soft: #F5E9E7;
 
   --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, monospace;
 
-  --radius-card: 10px;
-  --radius-control: 8px;
+  --radius-control: 10px;
   --radius-pill: 999px;
 
   --space-1: 4px;
@@ -32,7 +29,7 @@
   --space-5: 24px;
   --space-6: 32px;
 
-  --nav-height: 80px;
+  --nav-height: 88px;
 }
 
 * { box-sizing: border-box; }
@@ -40,16 +37,13 @@
 html, body {
   margin: 0;
   padding: 0;
-  background: var(--color-bg);
-  color: var(--color-text);
+  background: var(--bg);
+  color: var(--text);
   font-family: var(--font-ui);
   -webkit-font-smoothing: antialiased;
 }
 
-body {
-  min-height: 100vh;
-  min-height: 100dvh;
-}
+body { min-height: 100vh; min-height: 100dvh; }
 
 button, input, textarea {
   font-family: inherit;
@@ -63,17 +57,16 @@ button {
   text-align: left;
 }
 
-button:disabled {
-  opacity: 0.55;
-  cursor: default;
-}
+button:disabled { opacity: 0.5; cursor: default; }
+
+.tabular { font-variant-numeric: tabular-nums; }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -81,67 +74,64 @@ button:disabled {
    App shell
 --------------------------------------------- */
 .app-content {
-  max-width: 480px;
+  max-width: 520px;
   margin: 0 auto;
-  padding: var(--space-5) var(--space-4) calc(var(--nav-height) + var(--space-6));
+  padding: var(--space-6) var(--space-4) calc(var(--nav-height) + var(--space-6));
   min-height: 100vh;
 }
 
 .view-header {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
   margin-bottom: var(--space-5);
 }
 
 .view-header h1 {
-  font-size: 26px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   margin: 0;
 }
 
 .view-subhead {
   margin: 2px 0 0;
-  color: var(--color-text-muted);
-  font-size: 14px;
+  color: var(--text-muted);
+  font-size: 15px;
 }
 
 .back-btn {
   font-size: 15px;
-  color: var(--color-accent);
-  font-weight: 550;
+  color: var(--accent);
+  font-weight: 600;
   padding: 0;
   margin-bottom: var(--space-2);
   display: block;
 }
 
-.section {
-  margin-bottom: var(--space-6);
-}
+.section { margin-bottom: var(--space-6); }
 
 .section h2 {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
   margin: 0 0 var(--space-3);
-  color: var(--color-text);
 }
 
 .section-note {
   font-size: 13px;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   margin: 0 0 var(--space-3);
 }
 
 .empty-hint {
-  color: var(--color-text-muted);
-  font-size: 14px;
-  padding: var(--space-3) 0;
+  color: var(--text-muted);
+  font-size: 15px;
+  padding: var(--space-4) 0;
   margin: 0;
 }
 
 /* ---------------------------------------------
-   Bottom nav + FAB
+   Bottom nav — large, minimal, typography-led
 --------------------------------------------- */
 .nav-bar {
   position: fixed;
@@ -149,8 +139,9 @@ button:disabled {
   left: 0;
   right: 0;
   height: var(--nav-height);
-  background: var(--color-surface);
-  border-top: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: saturate(180%) blur(12px);
+  border-top: 1px solid var(--border);
   display: flex;
   align-items: stretch;
   padding-bottom: env(safe-area-inset-bottom);
@@ -163,270 +154,25 @@ button:disabled {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  color: var(--color-text-faint);
-  font-size: 13px;
-  font-weight: 600;
+  gap: 6px;
+  color: var(--text-faint);
+  font-size: 12px;
+  font-weight: 700;
   min-height: 100%;
 }
 
 .nav-tab svg {
-  width: 26px;
-  height: 26px;
+  width: 27px;
+  height: 27px;
+  stroke: currentColor;
 }
 
 .nav-tab.active {
-  color: var(--color-accent);
+  color: var(--text);
 }
 
-.nav-spacer {
-  width: 56px;
-  flex: none;
-}
-
-.fab {
-  position: fixed;
-  bottom: calc(var(--nav-height) - 28px + env(safe-area-inset-bottom));
-  left: 50%;
-  transform: translateX(-50%);
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: var(--color-accent);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 8px rgba(27, 30, 28, 0.22);
-  z-index: 11;
-}
-
-.fab:active {
-  transform: translateX(-50%) scale(0.94);
-}
-
-/* ---------------------------------------------
-   Cards
---------------------------------------------- */
-.card-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-3);
-  margin-bottom: var(--space-4);
-}
-
-.metric-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  padding: var(--space-4);
-  width: 100%;
-}
-
-.metric-label {
-  font-size: 13px;
-  color: var(--color-text-muted);
-  margin-bottom: 2px;
-}
-
-.metric-value {
-  font-family: var(--font-mono);
-  font-size: 24px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.metric-delta {
-  font-size: 13px;
-  color: var(--color-accent);
-  margin-top: 4px;
-}
-
-.metric-delta.muted {
-  color: var(--color-text-muted);
-}
-
-.sparkline {
-  width: 100%;
-  height: 40px;
-  margin-top: var(--space-2);
-}
-
-.sparkline path {
-  fill: none;
-  stroke: var(--color-accent);
-  stroke-width: 1.75;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.sparkline-lg {
-  width: 100%;
-  height: 70px;
-  margin-top: var(--space-3);
-}
-
-.sparkline-lg path {
-  fill: none;
-  stroke: var(--color-accent);
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.workout-card {
-  background: var(--color-accent-soft);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  padding: var(--space-4);
-  margin-bottom: var(--space-5);
-}
-
-.workout-card .btn-primary {
-  width: 100%;
-  margin-top: var(--space-3);
-}
-
-.stat-row {
-  display: flex;
-  gap: var(--space-2);
-}
-
-.stat {
-  flex: 1;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  padding: var(--space-3);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.stat-value {
-  font-family: var(--font-mono);
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.stat-label {
-  font-size: 12px;
-  color: var(--color-text-muted);
-}
-
-/* ---------------------------------------------
-   List rows (ledger style — hairline, no card box)
---------------------------------------------- */
-.list-card {
-  display: block;
-  width: 100%;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  padding: var(--space-4);
-  margin-bottom: var(--space-2);
-}
-
-.list-card-title {
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.list-card-sub {
-  font-size: 13px;
-  color: var(--color-text-muted);
-  margin-top: 2px;
-}
-
-.progress-card {
-  display: block;
-  width: 100%;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  padding: var(--space-4);
-}
-
-.progress-card-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text-muted);
-}
-
-.progress-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.progress-row:last-child {
-  border-bottom: none;
-}
-
-.progress-row-title {
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.progress-row-sub {
-  font-size: 13px;
-  color: var(--color-text-muted);
-  margin-top: 2px;
-  font-family: var(--font-mono);
-}
-
-.progress-row-right {
-  text-align: right;
-}
-
-.progress-row-value {
-  font-family: var(--font-mono);
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.progress-row-delta {
-  font-size: 12px;
-  color: var(--color-accent);
-  margin-top: 2px;
-}
-
-.history-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--color-border);
-  gap: var(--space-3);
-}
-
-.history-row:last-child {
-  border-bottom: none;
-}
-
-.history-date {
-  font-size: 14px;
-  font-weight: 600;
-  flex: none;
-  width: 84px;
-}
-
-.history-detail {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  color: var(--color-text-muted);
-  text-align: right;
-  flex: 1;
-}
-
-.archive-btn {
-  font-family: var(--font-ui);
-  font-size: 12px;
-  color: var(--color-danger);
-  margin-left: var(--space-3);
+.nav-tab.active svg {
+  stroke-width: 2.4;
 }
 
 /* ---------------------------------------------
@@ -434,11 +180,12 @@ button:disabled {
 --------------------------------------------- */
 .btn-primary {
   display: block;
-  background: var(--color-accent);
-  color: #fff;
-  font-size: 15px;
-  font-weight: 600;
-  padding: 13px var(--space-4);
+  width: 100%;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 16px;
+  font-weight: 700;
+  padding: 15px var(--space-5);
   border-radius: var(--radius-pill);
   text-align: center;
 }
@@ -448,193 +195,239 @@ button:disabled {
 .btn-secondary {
   display: block;
   width: 100%;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border-strong);
-  color: var(--color-text);
-  font-size: 15px;
-  font-weight: 600;
-  padding: 12px var(--space-4);
+  background: var(--bg);
+  border: 1.5px solid var(--border-strong);
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 700;
+  padding: 14px var(--space-5);
   border-radius: var(--radius-pill);
   text-align: center;
   margin-bottom: var(--space-3);
+}
+
+.btn-danger {
+  display: block;
+  width: 100%;
+  background: var(--bg);
+  border: 1.5px solid var(--danger);
+  color: var(--danger);
+  font-size: 15px;
+  font-weight: 700;
+  padding: 13px var(--space-5);
+  border-radius: var(--radius-pill);
+  text-align: center;
 }
 
 .btn-text {
   display: block;
   width: 100%;
   text-align: center;
-  color: var(--color-text-muted);
-  font-size: 14px;
-  padding: var(--space-2);
+  color: var(--text-muted);
+  font-size: 15px;
+  font-weight: 600;
+  padding: var(--space-3);
 }
 
 /* ---------------------------------------------
-   Workout logging
+   List rows — flat, dividers, no boxed cards
+--------------------------------------------- */
+.list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--border);
+  gap: var(--space-3);
+}
+
+.list-row:last-child { border-bottom: none; }
+
+.list-row-title {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.list-row-sub {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.list-row-right {
+  text-align: right;
+  flex: none;
+}
+
+.list-row-action {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  padding: 4px 0 4px 12px;
+}
+
+.list-row-action.danger { color: var(--danger); }
+
+/* ---------------------------------------------
+   Active workout banner (Today / Train)
+--------------------------------------------- */
+.active-banner {
+  background: var(--accent-soft);
+  border-radius: var(--radius-control);
+  padding: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.active-banner-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.active-banner-title {
+  font-size: 20px;
+  font-weight: 800;
+  margin-top: 2px;
+}
+
+.active-banner .btn-primary {
+  margin-top: var(--space-3);
+}
+
+/* ---------------------------------------------
+   Workout screen — exercise blocks + set rows
 --------------------------------------------- */
 .exercise-block {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  padding: var(--space-4);
-  margin-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: var(--space-5);
+  margin-bottom: var(--space-5);
 }
+
+.exercise-block:last-of-type { border-bottom: none; }
 
 .exercise-block-header {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: var(--space-2);
+  margin-bottom: var(--space-2);
 }
 
 .exercise-name {
-  font-size: 16px;
-  font-weight: 650;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
 .exercise-remove {
-  font-size: 12px;
-  color: var(--color-text-faint);
-  flex: none;
+  font-size: 13px;
+  color: var(--text-faint);
+  font-weight: 600;
 }
 
 .exercise-previous {
-  margin-top: 2px;
-  margin-bottom: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  background: var(--color-bg);
-  border-radius: var(--radius-control);
-}
-
-.exercise-previous-label {
-  font-size: 11px;
-  color: var(--color-text-faint);
-  margin-bottom: 2px;
-}
-
-.prev-set-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-family: var(--font-mono);
   font-size: 14px;
-  color: var(--color-text-muted);
-  padding: 3px 0;
+  color: var(--text-muted);
+  margin-bottom: var(--space-3);
 }
 
-.prev-copy-btn {
-  font-family: var(--font-ui);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-accent);
-  padding: 2px 8px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-pill);
+.exercise-previous .copy-link {
+  color: var(--accent);
+  font-weight: 700;
+  margin-left: 6px;
 }
 
-.set-rows {
+.set-header-row {
   display: flex;
-  flex-direction: column;
   gap: var(--space-2);
+  padding: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
+
+.set-header-row .set-index-col { width: 22px; flex: none; }
+.set-header-row .set-input-col { flex: 1; }
+.set-header-row .set-end-col { width: 30px; flex: none; }
+
+.set-rows { display: flex; flex-direction: column; gap: var(--space-2); }
 
 .set-row {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  border-radius: var(--radius-control);
-  transition: none;
-}
-
-.set-row-planned .set-weight,
-.set-row-planned .set-reps {
-  border-style: dashed;
-  color: var(--color-text-muted);
-}
-
-.set-check {
-  width: 16px;
-  flex: none;
-  text-align: center;
-  color: var(--color-accent);
-  font-size: 15px;
 }
 
 .set-index {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  color: var(--color-text-faint);
-  width: 16px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-faint);
+  width: 22px;
   flex: none;
 }
 
 .set-row input {
   flex: 1;
   min-width: 0;
-  font-family: var(--font-mono);
-  font-size: 16px;
-  border: 1px solid var(--color-border-strong);
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+  border: 1.5px solid var(--border-strong);
   border-radius: var(--radius-control);
-  padding: 9px var(--space-2);
-  background: var(--color-bg);
+  padding: 11px var(--space-3);
+  background: var(--surface);
 }
 
-.set-x {
-  color: var(--color-text-faint);
-  flex: none;
-}
+.set-row-planned input { border-style: dashed; color: var(--text-muted); }
 
 .set-remove {
   flex: none;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-text-faint);
-  font-size: 18px;
-  border-radius: 50%;
+  color: var(--text-faint);
+  font-size: 20px;
 }
 
 .btn-add-set {
-  margin-top: var(--space-3);
+  margin-top: var(--space-2);
   font-size: 14px;
-  font-weight: 600;
-  color: var(--color-accent);
+  font-weight: 700;
+  color: var(--accent);
 }
 
-#add-exercise-btn {
-  margin-bottom: var(--space-3);
-}
-
-#finish-workout-btn {
-  margin-bottom: var(--space-2);
-}
+#add-exercise-btn { margin-bottom: var(--space-3); }
+#finish-workout-btn { margin-bottom: var(--space-2); }
 
 /* ---------------------------------------------
-   Modal sheet (exercise picker, quick log)
+   Modal sheet
 --------------------------------------------- */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(27, 30, 28, 0.4);
+  background: rgba(21, 24, 28, 0.4);
   display: flex;
   align-items: flex-end;
   z-index: 20;
 }
 
 .modal-sheet {
-  background: var(--color-surface);
+  background: var(--bg);
   width: 100%;
   max-height: 82vh;
   overflow-y: auto;
-  border-radius: 16px 16px 0 0;
+  border-radius: 20px 20px 0 0;
   padding: var(--space-4) var(--space-4) calc(var(--space-6) + env(safe-area-inset-bottom));
 }
 
-/* Used for sheets with a search field + variable-length results (the
-   exercise picker). Fixed height so the search input never moves as the
-   result count changes — only the list below it grows/shrinks, and it
-   scrolls independently instead of resizing the whole sheet. */
+/* Fixed-height variant for sheets with a search field + variable-length
+   results: the input never moves as result count changes, only the list
+   underneath grows/shrinks, and it scrolls independently. */
 .modal-sheet-search {
   height: 78vh;
   max-height: 78vh;
@@ -657,13 +450,14 @@ button:disabled {
 }
 
 .modal-header h2 {
-  font-size: 18px;
+  font-size: 19px;
+  font-weight: 800;
   margin: 0;
 }
 
 .modal-close {
   font-size: 22px;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   width: 32px;
   height: 32px;
   display: flex;
@@ -673,12 +467,13 @@ button:disabled {
 
 .modal-search {
   width: 100%;
-  border: 1px solid var(--color-border-strong);
+  border: 1.5px solid var(--border-strong);
   border-radius: var(--radius-control);
-  padding: 10px var(--space-3);
-  font-size: 15px;
+  padding: 12px var(--space-3);
+  font-size: 16px;
   margin-bottom: var(--space-3);
-  background: var(--color-bg);
+  background: var(--surface);
+  flex: none;
 }
 
 .modal-list-item {
@@ -687,78 +482,74 @@ button:disabled {
   justify-content: space-between;
   width: 100%;
   padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--border);
+  font-size: 16px;
 }
+
+.modal-list-item.selected { color: var(--accent); font-weight: 700; }
 
 .modal-list-sub {
-  font-size: 12px;
-  color: var(--color-text-muted);
+  font-size: 13px;
+  color: var(--text-muted);
 }
 
-.quicklog-options {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
+.modal-form { display: flex; flex-direction: column; gap: var(--space-3); }
 
-.quicklog-option {
-  padding: var(--space-4);
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.quicklog-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.quicklog-form label {
+.modal-form label {
   display: flex;
   flex-direction: column;
   gap: 4px;
   font-size: 13px;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
+  font-weight: 600;
 }
 
-.quicklog-form input,
-.quicklog-form textarea {
+.modal-form input, .modal-form textarea {
   font-size: 16px;
-  color: var(--color-text);
-  border: 1px solid var(--color-border-strong);
+  color: var(--text);
+  border: 1.5px solid var(--border-strong);
   border-radius: var(--radius-control);
-  padding: 10px var(--space-3);
-  background: var(--color-bg);
+  padding: 11px var(--space-3);
+  background: var(--surface);
 }
 
-.quicklog-form .btn-primary {
-  margin-top: var(--space-2);
-  border: none;
-  width: 100%;
-}
+.modal-form .btn-primary { margin-top: var(--space-2); border: none; }
 
 /* ---------------------------------------------
-   Settings
+   Segmented control (units)
 --------------------------------------------- */
 .segmented {
   display: flex;
-  border: 1px solid var(--color-border-strong);
+  border: 1.5px solid var(--border-strong);
   border-radius: var(--radius-pill);
   overflow: hidden;
   width: fit-content;
 }
 
 .segmented-btn {
-  padding: 8px var(--space-5);
+  padding: 9px var(--space-5);
   font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text-muted);
+  font-weight: 700;
+  color: var(--text-muted);
 }
 
 .segmented-btn.active {
-  background: var(--color-accent);
-  color: #fff;
+  background: var(--text);
+  color: var(--bg);
+}
+
+/* ---------------------------------------------
+   Placeholder screens (Progress in Phase 1)
+--------------------------------------------- */
+.placeholder-block {
+  padding: var(--space-6) 0;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.placeholder-block strong {
+  display: block;
+  color: var(--text);
+  font-size: 18px;
+  margin-bottom: var(--space-2);
 }

@@ -2,85 +2,90 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { freshApp } = require('./helpers/setup');
 
-test('startWorkout is idempotent: calling it twice in a row resumes, never duplicates', async () => {
+test('startWorkout is idempotent: a second call resumes, never duplicates', async () => {
   const App = freshApp();
-  const bench = await App.commands.createExercise('Bench Press');
-
-  const first = await App.commands.startWorkout('Workout', [bench.id]);
-  const second = await App.commands.startWorkout('Workout', [bench.id]);
-
-  assert.equal(second.id, first.id, 'second call should resume the same workout, not create another');
-  const inProgress = (await App.db.getAll('workouts')).filter(w => w.status === 'in_progress');
-  assert.equal(inProgress.length, 1);
+  const first = await App.commands.startWorkout('Workout', []);
+  const second = await App.commands.startWorkout('Workout', []);
+  assert.equal(second.id, first.id);
+  const active = (await App.db.getAll('workouts')).filter(w => w.status === 'active');
+  assert.equal(active.length, 1);
 });
 
-test('repeatLastWorkout and startFromTemplate also refuse to create a second active workout', async () => {
+test('repeatLastWorkout and startFromSession also resume rather than duplicate an active workout', async () => {
   const App = freshApp();
   const bench = await App.commands.createExercise('Bench Press');
-  const w1 = await App.commands.createWorkout('Day 1', [bench.id]);
+  const w1 = await App.commands.createWorkout({ title: 'Day 1', exerciseIds: [bench.id] });
   await App.commands.finishWorkout(w1.id);
 
   const active = await App.commands.startWorkout('Workout', [bench.id]);
   const viaRepeat = await App.commands.repeatLastWorkout();
-  const viaTemplate = await App.commands.startFromTemplate({ name: 'X', exercises: [{ exerciseId: bench.id, order: 0 }] });
+  const viaSession = await App.commands.startFromSession({ name: 'X', exercises: [bench.id] });
 
   assert.equal(viaRepeat.id, active.id);
-  assert.equal(viaTemplate.id, active.id);
-  const inProgress = (await App.db.getAll('workouts')).filter(w => w.status === 'in_progress');
-  assert.equal(inProgress.length, 1);
+  assert.equal(viaSession.id, active.id);
+  const activeRows = (await App.db.getAll('workouts')).filter(w => w.status === 'active');
+  assert.equal(activeRows.length, 1);
 });
 
-test('a simulated double-tap race (two concurrent startWorkout calls) still yields exactly one active workout', async () => {
+test('repeatLastWorkout copies exercise structure but zero completed sets', async () => {
   const App = freshApp();
   const bench = await App.commands.createExercise('Bench Press');
+  const w1 = await App.commands.createWorkout({ title: 'Upper A', exerciseIds: [bench.id] });
+  const s1 = await App.commands.addSet(w1.id, bench.id);
+  await App.commands.updateSet(s1.id, { weight: 135, reps: 8 });
+  await App.commands.finishWorkout(w1.id);
 
-  // Both calls read "no active workout" before either write lands —
-  // this is the exact race that produced duplicate workouts before the fix.
-  const [a, b] = await Promise.all([
-    App.commands.startWorkout('Workout', [bench.id]),
-    App.commands.startWorkout('Workout', [bench.id])
+  const w2 = await App.commands.repeatLastWorkout();
+  assert.notEqual(w2.id, w1.id);
+  assert.deepEqual(w2.exerciseOrder, [bench.id]);
+  const sets2 = await App.queries.getSetsForWorkoutExercise(w2.id, bench.id);
+  assert.equal(sets2.length, 0, 'repeat must not pre-fill historical numbers');
+});
+
+test('a simulated concurrent double-tap still yields exactly one active workout after consolidation', async () => {
+  const App = freshApp();
+  await Promise.all([
+    App.commands.startWorkout('Workout', []),
+    App.commands.startWorkout('Workout', [])
   ]);
-
-  const inProgress = (await App.db.getAll('workouts')).filter(w => w.status === 'in_progress');
-  // The guard can't fully close a true concurrent race (both reads can win
-  // before either write commits) — that's what consolidateActiveWorkouts
-  // is for. Assert the safety net actually cleans it up losslessly.
-  if (inProgress.length > 1) {
+  let active = (await App.db.getAll('workouts')).filter(w => w.status === 'active');
+  if (active.length > 1) {
     const { resolvedCount } = await App.commands.consolidateActiveWorkouts();
-    assert.equal(resolvedCount, inProgress.length - 1);
+    assert.equal(resolvedCount, active.length - 1);
   }
-  const finalActive = (await App.db.getAll('workouts')).filter(w => w.status === 'in_progress');
-  assert.equal(finalActive.length, 1);
+  active = (await App.db.getAll('workouts')).filter(w => w.status === 'active');
+  assert.equal(active.length, 1);
 });
 
-test('consolidateActiveWorkouts keeps the most recently started workout active and completes the rest without deleting sets', async () => {
+test('consolidateActiveWorkouts keeps the newest active and preserves sets on the rest', async () => {
   const App = freshApp();
   const bench = await App.commands.createExercise('Bench Press');
 
-  // Simulate the pre-fix bug directly: two independently created in_progress
-  // workouts for the same day, each with logged sets.
-  const w1 = await App.commands.createWorkout('Workout', [bench.id]);
-  const [we1] = await App.queries.getWorkoutExercises(w1.id);
-  const s1 = await App.commands.addEmptySet(we1);
+  const w1 = await App.commands.createWorkout({ exerciseIds: [bench.id] });
+  const s1 = await App.commands.addSet(w1.id, bench.id);
   await App.commands.updateSet(s1.id, { weight: 100, reps: 10 });
 
   await new Promise(r => setTimeout(r, 5));
-  const w2 = await App.commands.createWorkout('Workout', [bench.id]);
-  const [we2] = await App.queries.getWorkoutExercises(w2.id);
-  const s2 = await App.commands.addEmptySet(we2);
+  const w2 = await App.commands.createWorkout({ exerciseIds: [bench.id] });
+  const s2 = await App.commands.addSet(w2.id, bench.id);
   await App.commands.updateSet(s2.id, { weight: 115, reps: 8 });
 
   const { resolvedCount } = await App.commands.consolidateActiveWorkouts();
   assert.equal(resolvedCount, 1);
 
   const stillActive = await App.queries.getActiveWorkout();
-  assert.equal(stillActive.id, w2.id, 'the more recently started workout stays active');
+  assert.equal(stillActive.id, w2.id);
 
   const w1After = await App.queries.getWorkout(w1.id);
-  assert.equal(w1After.status, 'completed', 'the older duplicate is marked completed, not deleted');
+  assert.equal(w1After.status, 'completed');
+  assert.equal((await App.queries.getSetsForWorkoutExercise(w1.id, bench.id))[0].weight, 100, 'set is preserved, not deleted');
+});
 
-  // Its set is still there and still shows up in exercise history.
-  const history = await App.queries.getExerciseHistory(bench.id);
-  const totalSetsAcrossHistory = history.reduce((n, h) => n + h.sets.length, 0);
-  assert.equal(totalSetsAcrossHistory, 1, 'only the completed duplicate contributes to history; the still-active one is correctly excluded until finished');
+test('finishing the active workout allows an explicit second workout the same day', async () => {
+  const App = freshApp();
+  const w1 = await App.commands.startWorkout('Morning', []);
+  await App.commands.finishWorkout(w1.id);
+
+  const w2 = await App.commands.startWorkout('Evening', []);
+  assert.notEqual(w2.id, w1.id, 'finishing clears the active slot so a second explicit workout is allowed');
 });

@@ -9,9 +9,6 @@ const SOURCE_FILES = [
   '../../js/analytics.js'
 ];
 
-// Loads the app's real source files (unmodified) into a clean global
-// environment with a brand-new in-memory IndexedDB, so each test gets an
-// isolated database and the exact same code that ships to the browser.
 function freshApp() {
   global.window = global;
   global.indexedDB = new IDBFactory();
