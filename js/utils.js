@@ -53,6 +53,18 @@ App.utils = (function () {
     return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
   }
 
+  // Compact "Weekday · Mon Day" form (e.g. "Sun · Sep 14"), used where a
+  // single day's heading needs to be short rather than fully spelled out.
+  // Built the same local-time-safe way as formatDateHeading/formatDateLabel
+  // above — parsing dateStr with an explicit T00:00:00 keeps this on the
+  // LOCAL calendar date rather than shifting a day via UTC interpretation.
+  function formatDateCompact(dateStr) {
+    const d = new Date(dateStr + 'T00:00:00');
+    const weekday = d.toLocaleDateString(undefined, { weekday: 'short' });
+    const monthDay = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return `${weekday} · ${monthDay}`;
+  }
+
   // All month math below uses the new Date(year, month, day) constructor,
   // which is ALWAYS local-time — never toISOString()/UTC — consistent
   // with localISOFromDate() above. This is what keeps month navigation
@@ -120,7 +132,7 @@ App.utils = (function () {
 
   return {
     uuid, todayLocalISO, daysAgoISO, nowISO, localISOFromDate,
-    formatDateLabel, formatDateHeading, formatTime, estimate1RM, debounce, el, escapeHtml,
+    formatDateLabel, formatDateHeading, formatDateCompact, formatTime, estimate1RM, debounce, el, escapeHtml,
     daysInMonth, formatMonthHeading, firstWeekdayOfMonth, addMonthsLocal, dateAtLocal
   };
 })();

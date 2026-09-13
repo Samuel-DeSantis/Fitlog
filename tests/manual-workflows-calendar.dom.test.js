@@ -180,3 +180,21 @@ test('Calendar QA BUGFIX: starting a plan while another workout is active shows 
   const reloadedB = await App.queries.getCalendarEntry(entryB.id);
   assert.equal(reloadedB.workoutId, null, "plan B must remain unattached to plan A's active workout");
 });
+
+test('Calendar QA: header shows the current year, day-detail heading uses compact weekday format', async () => {
+  const { document, App } = await bootRealApp();
+  document.location.hash = '/calendar';
+  await wait(30);
+
+  const heading = document.querySelector('.view-header h1').textContent;
+  const currentYear = new Date().getFullYear();
+  assert.equal(heading, `Calendar · ${currentYear}`);
+
+  const todayStr = App.utils.todayLocalISO();
+  click(document.querySelector(`.calendar-day[data-date="${todayStr}"]`));
+  await wait(30);
+
+  const dayHeading = document.querySelector('.modal-header h2').textContent;
+  assert.equal(dayHeading, App.utils.formatDateCompact(todayStr));
+  assert.match(dayHeading, /^[A-Za-z]{3} · [A-Za-z]{3} \d{1,2}$/);
+});

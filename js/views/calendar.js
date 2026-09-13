@@ -50,7 +50,7 @@ App.views = App.views || {};
       .join('');
 
     container.innerHTML = `
-      <div class="view-header"><h1>Calendar</h1></div>
+      <div class="view-header"><h1>Calendar · ${currentYear}</h1></div>
       <div class="calendar-weekdays">${weekdayLabels.map(d => `<span>${d}</span>`).join('')}</div>
       <div class="calendar-scroll" id="calendar-scroll">${monthBlocksHtml}</div>
     `;
@@ -156,7 +156,7 @@ App.views = App.views || {};
       <div class="modal-overlay">
         <div class="modal-sheet">
           <div class="modal-header">
-            <h2>${App.utils.formatDateHeading(dateStr)}</h2>
+            <h2>${App.utils.formatDateCompact(dateStr)}</h2>
             <button class="modal-close">×</button>
           </div>
           ${rowsHtml.length ? rowsHtml.join('') : '<p class="empty-hint">Nothing planned or logged on this date.</p>'}
