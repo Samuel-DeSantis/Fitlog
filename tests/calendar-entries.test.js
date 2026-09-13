@@ -59,14 +59,93 @@ test('13 & 14. Completing the Workout flips the occurrence to completed, never b
   assert.equal(App.queries.calendarEntryStatus(pair), 'completed');
 });
 
-test('starting a plan resumes an already-active unrelated workout rather than erroring (documented limitation)', async () => {
+test('BUGFIX: starting a plan while an unrelated workout is active is refused, not silently attached', async () => {
   const App = freshApp();
   const other = await App.commands.startWorkout('Some Other Workout', []);
   const session = await App.commands.createSession('Upper Body', [], 'red');
   const entry = await App.commands.planCalendarEntry('2026-09-18', session.id);
 
-  const { workout } = await App.commands.startPlannedWorkout(entry.id);
-  assert.equal(workout.id, other.id, 'the single-active-workout invariant takes priority over the plan link');
+  await assert.rejects(
+    () => App.commands.startPlannedWorkout(entry.id),
+    (err) => err instanceof App.errors.ActiveWorkoutConflictError && err.activeWorkout.id === other.id
+  );
+
+  const reloadedEntry = await App.queries.getCalendarEntry(entry.id);
+  assert.equal(reloadedEntry.workoutId, null, 'the plan must NOT be attached to the unrelated active workout');
+
+  const activeRows = (await App.db.getAll('workouts')).filter(w => w.status === 'active');
+  assert.equal(activeRows.length, 1, 'no second active workout should have been created');
+  assert.equal(activeRows[0].id, other.id);
+});
+
+test('BUGFIX: two different planned entries — starting the second while the first is active is refused', async () => {
+  const App = freshApp();
+  const sessionA = await App.commands.createSession('Upper Body', [], 'red');
+  const sessionB = await App.commands.createSession('Lower Body', [], 'blue');
+  const entryA = await App.commands.planCalendarEntry('2026-09-18', sessionA.id);
+  const entryB = await App.commands.planCalendarEntry('2026-09-19', sessionB.id);
+
+  const { workout: workoutA } = await App.commands.startPlannedWorkout(entryA.id);
+  assert.equal(workoutA.status, 'active');
+
+  await assert.rejects(
+    () => App.commands.startPlannedWorkout(entryB.id),
+    (err) => err instanceof App.errors.ActiveWorkoutConflictError && err.activeWorkout.id === workoutA.id
+  );
+
+  const reloadedA = await App.queries.getCalendarEntry(entryA.id);
+  const reloadedB = await App.queries.getCalendarEntry(entryB.id);
+  assert.equal(reloadedA.workoutId, workoutA.id, "entry A keeps its own workout's link");
+  assert.equal(reloadedB.workoutId, null, 'entry B must remain unlinked');
+
+  // Finishing A frees up the active slot, so B can now start normally.
+  await App.commands.finishWorkout(workoutA.id);
+  const { workout: workoutB } = await App.commands.startPlannedWorkout(entryB.id);
+  assert.equal(workoutB.status, 'active');
+  assert.notEqual(workoutB.id, workoutA.id);
+});
+
+test('BUGFIX: concurrent start attempts on the SAME entry still resolve to one workout (no regression)', async () => {
+  const App = freshApp();
+  const session = await App.commands.createSession('Upper Body', [], 'red');
+  const entry = await App.commands.planCalendarEntry('2026-09-18', session.id);
+
+  const results = await Promise.all(
+    Array.from({ length: 5 }, () => App.commands.startPlannedWorkout(entry.id))
+  );
+  const ids = new Set(results.map(r => r.workout.id));
+  assert.equal(ids.size, 1, 'every concurrent call on the same entry must resolve to the SAME workout');
+
+  const activeRows = (await App.db.getAll('workouts')).filter(w => w.status === 'active');
+  assert.equal(activeRows.length, 1);
+});
+
+test('BUGFIX: concurrent start attempts on TWO DIFFERENT entries — exactly one succeeds, the other is refused', async () => {
+  const App = freshApp();
+  const sessionA = await App.commands.createSession('Upper Body', [], 'red');
+  const sessionB = await App.commands.createSession('Lower Body', [], 'blue');
+  const entryA = await App.commands.planCalendarEntry('2026-09-18', sessionA.id);
+  const entryB = await App.commands.planCalendarEntry('2026-09-19', sessionB.id);
+
+  const results = await Promise.allSettled([
+    App.commands.startPlannedWorkout(entryA.id),
+    App.commands.startPlannedWorkout(entryB.id)
+  ]);
+
+  const fulfilled = results.filter(r => r.status === 'fulfilled');
+  const rejected = results.filter(r => r.status === 'rejected');
+  assert.equal(fulfilled.length, 1, 'exactly one of the two concurrent starts should succeed');
+  assert.equal(rejected.length, 1, 'the other must be refused, not silently merged');
+  assert.ok(rejected[0].reason instanceof App.errors.ActiveWorkoutConflictError);
+
+  const activeRows = (await App.db.getAll('workouts')).filter(w => w.status === 'active');
+  assert.equal(activeRows.length, 1, 'only one workout should have been created across both attempts');
+
+  // Whichever entry lost the race must remain completely unlinked.
+  const reloadedA = await App.queries.getCalendarEntry(entryA.id);
+  const reloadedB = await App.queries.getCalendarEntry(entryB.id);
+  const linkedCount = [reloadedA, reloadedB].filter(e => e.workoutId).length;
+  assert.equal(linkedCount, 1, 'exactly one entry should have gotten linked');
 });
 
 test('deleting a planned Calendar Entry does not delete the Session', async () => {
@@ -163,4 +242,43 @@ test('backfillWorkout creates a completed historical workout without touching an
 
   const stillActive = await App.queries.getActiveWorkout();
   assert.equal(stillActive.id, active.id, 'the existing active workout must be unaffected');
+});
+
+test('BUGFIX: editing a linked Workout\'s date moves its Calendar Entry to the new date', async () => {
+  const App = freshApp();
+  const session = await App.commands.createSession('Upper Body', [], 'red');
+  const entry = await App.commands.planCalendarEntry('2026-09-18', session.id);
+  const { workout } = await App.commands.startPlannedWorkout(entry.id);
+  assert.equal(workout.date, '2026-09-18');
+
+  await App.commands.editWorkoutMeta(workout.id, { date: '2026-09-20' });
+
+  const reloadedEntry = await App.queries.getCalendarEntry(entry.id);
+  assert.equal(reloadedEntry.date, '2026-09-20', 'the plan must move to the workout\'s new date');
+
+  const oldDateEntries = await App.queries.getCalendarEntriesInRange('2026-09-18', '2026-09-18');
+  const newDateEntries = await App.queries.getCalendarEntriesInRange('2026-09-20', '2026-09-20');
+  assert.equal(oldDateEntries.length, 0, 'no longer found on the old date');
+  assert.equal(newDateEntries.length, 1, 'now found on the new date');
+  assert.equal(newDateEntries[0].id, entry.id);
+});
+
+test('BUGFIX: editing a linked Workout\'s title only does not move its Calendar Entry', async () => {
+  const App = freshApp();
+  const session = await App.commands.createSession('Upper Body', [], 'red');
+  const entry = await App.commands.planCalendarEntry('2026-09-18', session.id);
+  await App.commands.startPlannedWorkout(entry.id);
+
+  await App.commands.editWorkoutMeta(entry.workoutId || (await App.queries.getCalendarEntry(entry.id)).workoutId, { title: 'Renamed' });
+
+  const reloadedEntry = await App.queries.getCalendarEntry(entry.id);
+  assert.equal(reloadedEntry.date, '2026-09-18', 'a title-only edit must not touch the plan\'s date');
+});
+
+test('BUGFIX: editing the date of a workout with NO linked Calendar Entry works normally (no crash)', async () => {
+  const App = freshApp();
+  const workout = await App.commands.createWorkout({ title: 'Blank Workout', date: '2026-09-18', exerciseIds: [] });
+
+  const updated = await App.commands.editWorkoutMeta(workout.id, { date: '2026-09-25' });
+  assert.equal(updated.date, '2026-09-25');
 });

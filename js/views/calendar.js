@@ -2,16 +2,26 @@ window.App = window.App || {};
 App.views = App.views || {};
 
 (function () {
-  App.views.calendar = async function (container, parts) {
-    const today = new Date();
-    const year = parts[0] ? parseInt(parts[0], 10) : today.getFullYear();
-    const month0 = parts[1] ? parseInt(parts[1], 10) - 1 : today.getMonth();
-    await renderMonth(container, year, month0);
-  };
+  // Fixed window rendered around "today" rather than infinite scroll or
+  // month-by-month paging — bounded, still a single indexed range query,
+  // and gives "some recent history, some upcoming plans" without needing
+  // pagination machinery.
+  const MONTHS_BACK = 6;
+  const MONTHS_FORWARD = 3;
 
-  async function renderMonth(container, year, month0) {
-    const first = App.utils.dateAtLocal(year, month0, 1);
-    const last = App.utils.dateAtLocal(year, month0, App.utils.daysInMonth(year, month0));
+  App.views.calendar = async function (container) {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth0 = now.getMonth();
+
+    const months = [];
+    for (let offset = -MONTHS_BACK; offset <= MONTHS_FORWARD; offset++) {
+      months.push(App.utils.addMonthsLocal(currentYear, currentMonth0, offset));
+    }
+
+    const first = App.utils.dateAtLocal(months[0].year, months[0].month, 1);
+    const lastMonth = months[months.length - 1];
+    const last = App.utils.dateAtLocal(lastMonth.year, lastMonth.month, App.utils.daysInMonth(lastMonth.year, lastMonth.month));
 
     const [completedWorkouts, entryPairs, sessions] = await Promise.all([
       App.queries.getCompletedWorkoutsInRange(first, last),
@@ -33,6 +43,31 @@ App.views = App.views || {};
     });
 
     const todayStr = App.utils.todayLocalISO();
+    const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    const monthBlocksHtml = months
+      .map(({ year, month }) => renderMonthBlock(year, month, completedByDate, plannedByDate, sessionMap, todayStr))
+      .join('');
+
+    container.innerHTML = `
+      <div class="view-header"><h1>Calendar</h1></div>
+      <div class="calendar-weekdays">${weekdayLabels.map(d => `<span>${d}</span>`).join('')}</div>
+      <div class="calendar-scroll" id="calendar-scroll">${monthBlocksHtml}</div>
+    `;
+
+    container.querySelectorAll('.calendar-day[data-date]').forEach((btn) => {
+      btn.addEventListener('click', () => openDayDetail(btn.dataset.date));
+    });
+
+    // Land on today with some history visible above and upcoming plans
+    // below, rather than at the top of the scroll.
+    const todayCell = container.querySelector(`.calendar-day[data-date="${todayStr}"]`);
+    if (todayCell && typeof todayCell.scrollIntoView === 'function') {
+      todayCell.scrollIntoView({ block: 'center' });
+    }
+  };
+
+  function renderMonthBlock(year, month0, completedByDate, plannedByDate, sessionMap, todayStr) {
     const firstWeekday = App.utils.firstWeekdayOfMonth(year, month0);
     const numDays = App.utils.daysInMonth(year, month0);
 
@@ -61,30 +96,12 @@ App.views = App.views || {};
       `;
     }
 
-    const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-    container.innerHTML = `
-      <div class="view-header"><h1>Calendar</h1></div>
-      <div class="calendar-nav">
-        <button class="calendar-nav-btn" id="prev-month" aria-label="Previous month">‹</button>
+    return `
+      <div class="calendar-month-block" data-month="${year}-${String(month0 + 1).padStart(2, '0')}">
         <div class="calendar-month-heading">${App.utils.formatMonthHeading(year, month0)}</div>
-        <button class="calendar-nav-btn" id="next-month" aria-label="Next month">›</button>
+        <div class="calendar-grid">${cellsHtml}</div>
       </div>
-      <div class="calendar-weekdays">${weekdayLabels.map(d => `<span>${d}</span>`).join('')}</div>
-      <div class="calendar-grid">${cellsHtml}</div>
     `;
-
-    container.querySelector('#prev-month').addEventListener('click', () => {
-      const p = App.utils.addMonthsLocal(year, month0, -1);
-      App.router.go(`/calendar/${p.year}/${p.month + 1}`);
-    });
-    container.querySelector('#next-month').addEventListener('click', () => {
-      const n = App.utils.addMonthsLocal(year, month0, 1);
-      App.router.go(`/calendar/${n.year}/${n.month + 1}`);
-    });
-    container.querySelectorAll('.calendar-day[data-date]').forEach((btn) => {
-      btn.addEventListener('click', () => openDayDetail(btn.dataset.date));
-    });
   }
 
   async function openDayDetail(dateStr) {
@@ -160,8 +177,8 @@ App.views = App.views || {};
     });
 
     overlay.querySelectorAll('[data-start-entry]').forEach((btn) => {
-      btn.addEventListener('click', async (e) => {
-        e.currentTarget.disabled = true;
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
         try {
           const { workout } = await App.commands.startPlannedWorkout(btn.dataset.startEntry);
           overlay.remove();
@@ -171,6 +188,11 @@ App.views = App.views || {};
             overlay.remove();
             alert('There\'s a data conflict with active workouts — go to Today to resolve it before starting this one.');
             App.router.go('/today');
+            return;
+          }
+          if (err instanceof App.errors.ActiveWorkoutConflictError) {
+            btn.disabled = false;
+            alert(`You already have "${err.activeWorkout.title}" in progress. Finish or resume it before starting this workout.`);
             return;
           }
           throw err;

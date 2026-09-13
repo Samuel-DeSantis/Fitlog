@@ -4,10 +4,24 @@ App.ui = (function () {
   // Fixed-height sheet: the search field never moves as the result count
   // changes, because the list scrolls independently underneath it rather
   // than the whole sheet resizing around its content.
+  //
+  // Priority order matches the request: recently-used (shown only in the
+  // default browse state), then search, then muscle-group chips — search
+  // and the active chip always combine (AND), so search stays the fastest
+  // way to find a specific exercise regardless of what's filtered.
   async function openExercisePicker(excludeIds, onSelect) {
-    const exercises = (await App.queries.getExercises())
+    const [allExercises, recentIds] = await Promise.all([
+      App.queries.getExercises(),
+      App.queries.getRecentlyUsedExerciseIds(8)
+    ]);
+    const exercises = allExercises
       .filter(e => !excludeIds.includes(e.id))
       .sort((a, b) => a.name.localeCompare(b.name));
+    const exerciseMap = Object.fromEntries(exercises.map(e => [e.id, e]));
+    const recentExercises = recentIds.map(id => exerciseMap[id]).filter(Boolean);
+    const recentIdSet = new Set(recentExercises.map(e => e.id));
+
+    let activeCategory = 'All';
 
     const overlay = App.utils.el(`
       <div class="modal-overlay">
@@ -17,6 +31,11 @@ App.ui = (function () {
             <button class="modal-close">×</button>
           </div>
           <input type="text" class="modal-search" placeholder="Search exercises">
+          <div class="muscle-chip-row">
+            ${App.muscleGroups.CATEGORIES.map(c => `
+              <button type="button" class="muscle-chip ${c === 'All' ? 'muscle-chip-active' : ''}" data-category="${c}">${c}</button>
+            `).join('')}
+          </div>
           <div class="modal-list"></div>
         </div>
       </div>
@@ -24,22 +43,50 @@ App.ui = (function () {
     document.body.appendChild(overlay);
 
     const listEl = overlay.querySelector('.modal-list');
-    function renderList(filter) {
-      const f = (filter || '').toLowerCase();
-      const filtered = exercises.filter(e => e.name.toLowerCase().includes(f));
-      listEl.innerHTML = filtered.map(e => `
-        <button class="modal-list-item" data-id="${e.id}"><span>${App.utils.escapeHtml(e.name)}</span></button>
-      `).join('') || '<p class="empty-hint">No matches</p>';
+    const searchInput = overlay.querySelector('.modal-search');
+
+    function itemHtml(e) {
+      return `<button class="modal-list-item" data-id="${e.id}"><span>${App.utils.escapeHtml(e.name)}</span></button>`;
+    }
+
+    function renderList() {
+      const query = searchInput.value.trim().toLowerCase();
+      const browsing = !query && activeCategory === 'All';
+
+      if (browsing && recentExercises.length) {
+        const rest = exercises.filter(e => !recentIdSet.has(e.id));
+        listEl.innerHTML = `
+          <div class="modal-list-section-label">Recently Used</div>
+          ${recentExercises.map(itemHtml).join('')}
+          <div class="modal-list-section-label">All Exercises</div>
+          ${rest.map(itemHtml).join('') || '<p class="empty-hint">No other exercises</p>'}
+        `;
+      } else {
+        const filtered = exercises.filter(e =>
+          (!query || e.name.toLowerCase().includes(query)) &&
+          App.muscleGroups.matchesCategory(e, activeCategory)
+        );
+        listEl.innerHTML = filtered.map(itemHtml).join('') || '<p class="empty-hint">No matches</p>';
+      }
+
       listEl.querySelectorAll('.modal-list-item').forEach((btn) => {
         btn.addEventListener('click', () => {
-          const ex = exercises.find(e => e.id === btn.dataset.id);
+          const ex = exerciseMap[btn.dataset.id];
           overlay.remove();
           onSelect(ex);
         });
       });
     }
-    renderList('');
-    overlay.querySelector('.modal-search').addEventListener('input', (e) => renderList(e.target.value));
+
+    renderList();
+    searchInput.addEventListener('input', renderList);
+    overlay.querySelectorAll('.muscle-chip').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        activeCategory = chip.dataset.category;
+        overlay.querySelectorAll('.muscle-chip').forEach((c) => c.classList.toggle('muscle-chip-active', c === chip));
+        renderList();
+      });
+    });
     overlay.querySelector('.modal-close').addEventListener('click', () => overlay.remove());
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
   }

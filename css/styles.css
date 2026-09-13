@@ -518,6 +518,45 @@ button:disabled { opacity: 0.5; cursor: default; }
   color: var(--text-muted);
 }
 
+.muscle-chip-row {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  flex: none;
+  padding-bottom: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+
+.muscle-chip {
+  flex: none;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+
+.muscle-chip-active {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+
+.modal-list-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+  padding: var(--space-3) 0 var(--space-1);
+}
+
+.modal-list-section-label:first-child {
+  padding-top: 0;
+}
+
 .modal-form { display: flex; flex-direction: column; gap: var(--space-3); }
 
 .modal-form label {
@@ -603,37 +642,23 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 
 /* ---------------------------------------------
-   Calendar month grid
+   Calendar — vertical scroll of stacked months
 --------------------------------------------- */
-.calendar-nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-4);
-}
-
-.calendar-nav-btn {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text);
-  border: 1.5px solid var(--border-strong);
-  border-radius: 50%;
-}
-
 .calendar-month-heading {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 800;
+  margin-bottom: var(--space-3);
+  color: var(--text);
+}
+
+.calendar-month-block {
+  margin-bottom: var(--space-6);
 }
 
 .calendar-weekdays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-4);
 }
 
 .calendar-weekdays span {

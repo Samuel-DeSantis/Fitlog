@@ -2,7 +2,7 @@ window.App = window.App || {};
 
 App.db = (function () {
   const DB_NAME = 'fitlog_v2';
-  const DB_VERSION = 2;
+  const DB_VERSION = 3;
   const FORMAT_VERSION = 1;
   const STORES = ['exercises', 'sessions', 'workouts', 'sets', 'calendarEntries', 'settings'];
 
@@ -58,6 +58,34 @@ App.db = (function () {
             if (!session.color) {
               session.color = 'gray';
               cursor.update(session);
+            }
+            cursor.continue();
+          };
+        }
+
+        // v2 -> v3: Exercises gained primaryMuscles/secondaryMuscles/
+        // equipment/movementType for the picker's search & muscle-group
+        // filtering. Existing exercises predate this — backfill by
+        // matching name against the known seed library; anything that
+        // doesn't match (a user's own custom exercise) gets empty
+        // defaults rather than a guessed category. IDs and every other
+        // field are untouched, so Sessions/Workouts/Sets/Calendar Entries
+        // referencing these exercises are completely unaffected.
+        if (oldVersion > 0 && oldVersion < 3) {
+          const exercisesStore = tx.objectStore('exercises');
+          const metadataByName = {};
+          (App.exerciseSeedData || []).forEach((e) => { metadataByName[e.name] = e; });
+          exercisesStore.openCursor().onsuccess = (ev) => {
+            const cursor = ev.target.result;
+            if (!cursor) return;
+            const ex = cursor.value;
+            if (ex.primaryMuscles === undefined) {
+              const meta = metadataByName[ex.name];
+              ex.primaryMuscles = meta ? meta.primaryMuscles : [];
+              ex.secondaryMuscles = meta ? meta.secondaryMuscles : [];
+              ex.equipment = meta ? meta.equipment : (ex.equipment || '');
+              ex.movementType = meta ? meta.movementType : '';
+              cursor.update(ex);
             }
             cursor.continue();
           };
@@ -189,6 +217,48 @@ App.db = (function () {
   // data is only cleared after validation passes — a bad file is rejected,
   // never silently destructive. The clear + every store's writes happen in
   // ONE transaction: if anything fails partway, nothing is left half-applied.
+  // Imported exercise records may predate the metadata fields entirely
+  // (an old formatVersion:1 backup, imported directly — the v2->v3
+  // IndexedDB migration only runs on schema upgrade, never on import).
+  // Normalize each one to the current shape:
+  //  - already has the fields (even empty arrays) -> pass through as-is,
+  //    respecting whatever the file actually says.
+  //  - legacy shape + merging into an existing record that already HAS
+  //    metadata -> keep the existing metadata; a legacy import must never
+  //    blank out richer data already in this database.
+  //  - legacy shape otherwise -> backfill by name against the seed
+  //    library, or empty defaults for an unrecognized (custom) exercise.
+  // IDs, names, archived state, and timestamps are untouched either way.
+  function isLegacyExerciseShape(record) {
+    return record.primaryMuscles === undefined;
+  }
+
+  function seedMetadataByName(name) {
+    const meta = (App.exerciseSeedData || []).find(e => e.name === name);
+    return meta
+      ? { primaryMuscles: meta.primaryMuscles, secondaryMuscles: meta.secondaryMuscles, equipment: meta.equipment, movementType: meta.movementType }
+      : { primaryMuscles: [], secondaryMuscles: [], equipment: '', movementType: '' };
+  }
+
+  async function normalizeImportedExercise(objectStore, item, mode) {
+    if (!isLegacyExerciseShape(item)) return item;
+
+    if (mode === 'merge') {
+      const existing = await reqToPromise(objectStore.get(item.id));
+      if (existing && !isLegacyExerciseShape(existing)) {
+        return {
+          ...item,
+          primaryMuscles: existing.primaryMuscles,
+          secondaryMuscles: existing.secondaryMuscles,
+          equipment: existing.equipment,
+          movementType: existing.movementType
+        };
+      }
+    }
+
+    return { ...item, ...seedMetadataByName(item.name) };
+  }
+
   async function importAll(data, mode) {
     mode = mode || 'merge';
     const { valid, errors } = validateImportPayload(data);
@@ -206,7 +276,14 @@ App.db = (function () {
         const records = data.stores[s];
         if (!Array.isArray(records)) continue;
         const os = tx.objectStore(s);
-        for (const item of records) os.put(item);
+        if (s === 'exercises') {
+          for (const item of records) {
+            const normalized = await normalizeImportedExercise(os, item, mode);
+            os.put(normalized);
+          }
+        } else {
+          for (const item of records) os.put(item);
+        }
       }
     });
   }

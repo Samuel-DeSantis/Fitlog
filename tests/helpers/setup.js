@@ -5,10 +5,13 @@ const SOURCE_FILES = [
   '../../js/utils.js',
   '../../js/errors.js',
   '../../js/sessionColors.js',
+  '../../js/exerciseMetadata.js',
+  '../../js/muscleGroups.js',
   '../../js/db.js',
   '../../js/queries.js',
   '../../js/commands.js',
-  '../../js/analytics.js'
+  '../../js/analytics.js',
+  '../../js/seed.js'
 ];
 
 function freshApp() {

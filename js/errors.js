@@ -13,6 +13,18 @@ class MultipleActiveWorkoutsError extends Error {
   }
 }
 
-App.errors = { MultipleActiveWorkoutsError };
+// Thrown when trying to start a planned Calendar Entry that has no
+// workout of its own yet, while a DIFFERENT workout is already active.
+// The plan must never be silently attached to that unrelated workout —
+// the caller has to finish/resume it first.
+class ActiveWorkoutConflictError extends Error {
+  constructor(activeWorkout) {
+    super('Another workout is already active. Finish or resume it before starting this one.');
+    this.name = 'ActiveWorkoutConflictError';
+    this.activeWorkout = activeWorkout;
+  }
+}
+
+App.errors = { MultipleActiveWorkoutsError, ActiveWorkoutConflictError };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = App.errors;

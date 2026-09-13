@@ -78,6 +78,30 @@ App.queries = (function () {
     return includeArchived ? all : all.filter(e => !e.archived);
   }
 
+  // Most recently trained exercises, most-recent-workout-first, deduped.
+  // Bounded to a recent date window via the existing 'date' index rather
+  // than scanning the whole (potentially large) workouts store.
+  async function getRecentlyUsedExerciseIds(limit) {
+    limit = limit || 8;
+    const cutoff = App.utils.daysAgoISO(90);
+    const today = App.utils.todayLocalISO();
+    const recentWorkouts = await db.getAllByIndexRange('workouts', 'date', IDBKeyRange.bound(cutoff, today));
+    recentWorkouts.sort((a, b) => b.date.localeCompare(a.date) || (b.startedAt || '').localeCompare(a.startedAt || ''));
+
+    const seen = new Set();
+    const ordered = [];
+    for (const w of recentWorkouts) {
+      for (const exId of (w.exerciseOrder || [])) {
+        if (!seen.has(exId)) {
+          seen.add(exId);
+          ordered.push(exId);
+          if (ordered.length >= limit) return ordered;
+        }
+      }
+    }
+    return ordered;
+  }
+
   // Every read normalizes color defensively (pre-color-feature sessions,
   // or imported data that lacks it) — callers never see an invalid color.
   async function getSessions() {
@@ -127,7 +151,7 @@ App.queries = (function () {
     getCompletedWorkoutsInRange, getAllCompletedWorkouts,
     getSetsForWorkout, getSetsForWorkoutExercise,
     getExerciseHistory, getPreviousPerformance,
-    getExercises, getSessions, getSession, getSettings,
+    getExercises, getSessions, getSession, getSettings, getRecentlyUsedExerciseIds,
     getCalendarEntry, getCalendarEntriesInRange, getCalendarEntriesWithWorkouts, calendarEntryStatus
   };
 })();

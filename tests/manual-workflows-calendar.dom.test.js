@@ -2,22 +2,36 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { bootRealApp, click, setValue, wait } = require('./helpers/domSetup');
 
-test('Calendar QA: month navigation updates the heading', async () => {
-  const { document } = await bootRealApp();
+test('Calendar QA: vertical scroll shows multiple months, no month-nav controls, and centers on today', async () => {
+  const { document, window, App } = await bootRealApp();
+
+  let scrolledElement = null;
+  window.Element.prototype.scrollIntoView = function () {
+    scrolledElement = this;
+  };
+
   document.location.hash = '/calendar';
-  await wait(30);
+  await wait(60);
 
-  const heading = () => document.querySelector('.calendar-month-heading').textContent;
-  const initial = heading();
+  const headings = document.querySelectorAll('.calendar-month-heading');
+  assert.ok(headings.length >= 6, 'multiple months should be rendered in one continuous scroll');
+  assert.equal(document.getElementById('prev-month'), null, 'prev/next navigation should be removed');
+  assert.equal(document.getElementById('next-month'), null, 'prev/next navigation should be removed');
+  assert.equal(document.querySelector('.calendar-nav'), null, 'the nav row itself should be gone');
 
-  click(document.getElementById('next-month'));
-  await wait(30);
-  const afterNext = heading();
-  assert.notEqual(afterNext, initial);
+  const todayStr = App.utils.todayLocalISO();
+  const todayCell = document.querySelector(`.calendar-day[data-date="${todayStr}"]`);
+  assert.ok(todayCell, "today's cell should be present");
+  assert.ok(todayCell.classList.contains('is-today'), 'today should be visually distinguished');
+  assert.equal(scrolledElement, todayCell, "the view should scroll today's cell into view on open");
 
-  click(document.getElementById('prev-month'));
-  await wait(30);
-  assert.equal(heading(), initial, 'prev-month should return to the original heading');
+  const recentHistory = App.utils.daysAgoISO(60);
+  const upcoming = App.utils.daysAgoISO(-60);
+  assert.ok(document.querySelector(`.calendar-day[data-date="${recentHistory}"]`), 'recent history should be visible above today');
+  assert.ok(document.querySelector(`.calendar-day[data-date="${upcoming}"]`), 'upcoming dates should be visible below today');
+
+  const farPast = App.utils.daysAgoISO(400);
+  assert.equal(document.querySelector(`.calendar-day[data-date="${farPast}"]`), null, 'the rendered window should be bounded, not infinite');
 });
 
 test('Calendar QA: plan a future Session, see a hollow colored dot, start it, finish it, see it become filled', async () => {
@@ -25,26 +39,26 @@ test('Calendar QA: plan a future Session, see a hollow colored dot, start it, fi
 
   // Create a red "Upper Body" session via Train first.
   document.location.hash = '/train';
-  await wait(30);
+  await wait(60);
   click(document.getElementById('create-session-btn'));
-  await wait(20);
+  await wait(40);
   setValue(document.querySelector('#session-name'), 'Upper Body');
   document.querySelector('[data-color="red"]').click();
   click(document.getElementById('session-add-exercise'));
-  await wait(20);
+  await wait(40);
   setValue(document.querySelector('.modal-search'), 'Bench');
-  await wait(20);
+  await wait(40);
   click(document.querySelector('.modal-list-item'));
-  await wait(20);
+  await wait(40);
   click(document.getElementById('session-save'));
-  await wait(30);
+  await wait(60);
 
   const futureDate = App.utils.daysAgoISO(-6);
   const session = (await App.queries.getSessions())[0];
   await App.commands.planCalendarEntry(futureDate, session.id);
 
   document.location.hash = '/calendar';
-  await wait(30);
+  await wait(60);
   const cell = document.querySelector(`.calendar-day[data-date="${futureDate}"]`);
   assert.ok(cell, 'the planned date should be visible in the current month view');
   const hollowDot = cell.querySelector('.calendar-dot.calendar-dot-hollow');
@@ -52,16 +66,16 @@ test('Calendar QA: plan a future Session, see a hollow colored dot, start it, fi
   assert.match(hollowDot.getAttribute('style'), /#C4483C/i, "the dot should use the session's red color");
 
   click(cell);
-  await wait(30);
+  await wait(60);
   click(document.querySelector('[data-start-entry]'));
-  await wait(30);
+  await wait(60);
   assert.match(document.location.hash, /^#\/workout\//);
 
   click(document.getElementById('finish-workout-btn'));
-  await wait(30);
+  await wait(60);
 
-  document.location.hash = `/calendar/${futureDate.slice(0, 4)}/${parseInt(futureDate.slice(5, 7), 10)}`;
-  await wait(30);
+  document.location.hash = '/calendar';
+  await wait(60);
   const cellAfter = document.querySelector(`.calendar-day[data-date="${futureDate}"]`);
   assert.ok(cellAfter.querySelector('.calendar-dot:not(.calendar-dot-hollow)'), 'completed occurrence should now show a filled dot');
   assert.equal(cellAfter.querySelectorAll('.calendar-dot').length, 1, 'the plan should not ALSO still show as a separate hollow dot');
@@ -72,17 +86,17 @@ test('Calendar QA: backfilling a past date creates a completed workout editable 
   const pastDate = App.utils.daysAgoISO(5);
 
   document.location.hash = '/calendar';
-  await wait(30);
+  await wait(60);
   const cell = document.querySelector(`.calendar-day[data-date="${pastDate}"]`);
   assert.ok(cell, 'the past date should be visible in the current month');
   click(cell);
-  await wait(30);
+  await wait(60);
 
   assert.ok(document.getElementById('add-workout-btn'), '+ Add Workout should be offered for a past date');
   click(document.getElementById('add-workout-btn'));
-  await wait(20);
+  await wait(40);
   click(document.querySelector('[data-blank]'));
-  await wait(30);
+  await wait(60);
 
   assert.match(document.location.hash, /^#\/workout\//);
   assert.ok(document.getElementById('save-btn'), 'a backfilled workout opens directly in edit mode, not active-logging mode');
@@ -93,13 +107,13 @@ test('Calendar QA: backfilling a past date creates a completed workout editable 
   assert.equal(w.status, 'completed');
 
   document.location.hash = '/calendar';
-  await wait(30);
+  await wait(60);
   click(document.querySelector(`.calendar-day[data-date="${pastDate}"]`));
-  await wait(30);
+  await wait(60);
   click(document.getElementById('add-workout-btn'));
-  await wait(20);
+  await wait(40);
   click(document.querySelector('[data-blank]'));
-  await wait(30);
+  await wait(60);
   const secondId = document.location.hash.replace('#/workout/', '');
   assert.notEqual(secondId, firstId);
 
@@ -114,18 +128,55 @@ test('Calendar QA: deleting a planned entry removes it from the day sheet but ke
   await App.commands.planCalendarEntry(futureDate, session.id);
 
   document.location.hash = '/calendar';
-  await wait(30);
+  await wait(60);
   click(document.querySelector(`.calendar-day[data-date="${futureDate}"]`));
-  await wait(30);
+  await wait(60);
   assert.ok(document.querySelector('[data-delete-entry]'));
   click(document.querySelector('[data-delete-entry]'));
-  await wait(30);
+  await wait(60);
 
   click(document.querySelector(`.calendar-day[data-date="${futureDate}"]`));
-  await wait(30);
+  await wait(60);
   assert.ok(!document.querySelector('[data-delete-entry]'), 'the plan should be gone from this date');
 
   document.location.hash = '/train';
-  await wait(30);
+  await wait(60);
   assert.match(document.body.textContent, /Lower Body/, 'the Session itself must still exist');
+});
+
+test('Calendar QA BUGFIX: starting a plan while another workout is active shows a clear message and does not attach it', async () => {
+  const { document, App } = await bootRealApp();
+
+  const sessionA = await App.commands.createSession('Upper Body', [], 'red');
+  const sessionB = await App.commands.createSession('Lower Body', [], 'blue');
+  const dateA = App.utils.daysAgoISO(-2);
+  const dateB = App.utils.daysAgoISO(-4);
+  await App.commands.planCalendarEntry(dateA, sessionA.id);
+  const entryB = await App.commands.planCalendarEntry(dateB, sessionB.id);
+
+  document.location.hash = '/calendar';
+  await wait(60);
+  click(document.querySelector(`.calendar-day[data-date="${dateA}"]`));
+  await wait(60);
+  click(document.querySelector('[data-start-entry]'));
+  await wait(60);
+  assert.match(document.location.hash, /^#\/workout\//, 'plan A should have started normally');
+
+  let alertMessage = null;
+  global.alert = (msg) => { alertMessage = msg; };
+
+  document.location.hash = '/calendar';
+  await wait(60);
+  click(document.querySelector(`.calendar-day[data-date="${dateB}"]`));
+  await wait(60);
+  const startBtnB = document.querySelector('[data-start-entry]');
+  click(startBtnB);
+  await wait(60);
+
+  assert.ok(alertMessage, 'a clear message should have been shown');
+  assert.match(alertMessage, /Upper Body|already have/i);
+  assert.equal(startBtnB.disabled, false, 'the button should be re-enabled so the user can back out');
+
+  const reloadedB = await App.queries.getCalendarEntry(entryB.id);
+  assert.equal(reloadedB.workoutId, null, "plan B must remain unattached to plan A's active workout");
 });

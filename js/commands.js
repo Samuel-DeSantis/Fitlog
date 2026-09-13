@@ -205,9 +205,34 @@ App.commands = (function () {
     });
   }
 
+  // If this workout originated from a planned Calendar Entry and its date
+  // changes, the entry's date moves with it — otherwise the plan would
+  // keep pointing at the old date while the workout it represents now
+  // lives on a different one. Only the `date` field cascades; title/notes
+  // edits never touch the calendar entry. Done in the same transaction as
+  // the workout update so the two can't end up disagreeing.
   async function editWorkoutMeta(workoutId, fields) {
-    return mutateWorkout(workoutId, (workout) => {
+    return db.runTransaction(['workouts', 'calendarEntries'], 'readwrite', async (tx) => {
+      const workoutsStore = tx.objectStore('workouts');
+      const workout = await db.reqToPromise(workoutsStore.get(workoutId));
+      if (!workout) return null;
+
       Object.assign(workout, fields);
+      workout.updatedAt = utils.nowISO();
+      workoutsStore.put(workout);
+
+      if ('date' in fields) {
+        const entriesStore = tx.objectStore('calendarEntries');
+        const allEntries = await db.reqToPromise(entriesStore.getAll());
+        const linked = allEntries.find(e => e.workoutId === workoutId);
+        if (linked && linked.date !== workout.date) {
+          linked.date = workout.date;
+          linked.updatedAt = utils.nowISO();
+          entriesStore.put(linked);
+        }
+      }
+
+      return workout;
     });
   }
 
@@ -222,8 +247,16 @@ App.commands = (function () {
     });
   }
 
-  async function createExercise(name) {
-    const ex = { id: utils.uuid(), name, archived: false, createdAt: utils.nowISO(), updatedAt: utils.nowISO() };
+  async function createExercise(name, options) {
+    options = options || {};
+    const ex = {
+      id: utils.uuid(), name,
+      primaryMuscles: options.primaryMuscles || [],
+      secondaryMuscles: options.secondaryMuscles || [],
+      equipment: options.equipment || '',
+      movementType: options.movementType || '',
+      archived: false, createdAt: utils.nowISO(), updatedAt: utils.nowISO()
+    };
     await db.put('exercises', ex);
     return ex;
   }
@@ -301,30 +334,59 @@ App.commands = (function () {
   // "today"), so the calendar dot for that date simply flips from hollow
   // to filled in place, matching what the user planned regardless of the
   // exact moment they actually pressed Start.
+  // Starts (or resumes) the Workout for a planned Calendar Entry:
+  //  - If the entry is already linked to a workout that still exists,
+  //    that link is authoritative — just return it (covers "tapped Start,
+  //    navigated away, came back and tapped Start again").
+  //  - Otherwise, this entry has no workout of its own yet. If some OTHER
+  //    workout is already active at this point, it is by definition
+  //    unrelated to this entry — refuse rather than silently attaching
+  //    the plan to it, and let the caller tell the user to finish/resume
+  //    it first.
+  //  - Only when neither of the above applies does this create a new
+  //    workout and link it.
+  // The whole check-then-act sequence (including the session lookup) runs
+  // inside ONE transaction so two concurrent start attempts — on the same
+  // entry, or on two different entries — can't both succeed.
   async function startPlannedWorkout(calendarEntryId) {
-    const entry = await db.get('calendarEntries', calendarEntryId);
-    if (!entry) return null;
+    return db.runTransaction(['calendarEntries', 'workouts', 'sessions'], 'readwrite', async (tx) => {
+      const entriesStore = tx.objectStore('calendarEntries');
+      const workoutsStore = tx.objectStore('workouts');
+      const sessionsStore = tx.objectStore('sessions');
 
-    if (entry.workoutId) {
-      const existing = await db.get('workouts', entry.workoutId);
-      if (existing) return { entry, workout: existing };
-    }
+      const entry = await db.reqToPromise(entriesStore.get(calendarEntryId));
+      if (!entry) return null;
 
-    const session = entry.sessionId ? await App.queries.getSession(entry.sessionId) : null;
-    const workout = await resolveActiveWorkout({
-      title: session ? session.name : 'Workout',
-      exerciseIds: session ? session.exercises : [],
-      sessionId: entry.sessionId,
-      date: entry.date
-    });
+      if (entry.workoutId) {
+        const existing = await db.reqToPromise(workoutsStore.get(entry.workoutId));
+        if (existing) return { entry, workout: existing };
+      }
 
-    if (entry.workoutId !== workout.id) {
+      const activeRows = await db.reqToPromise(workoutsStore.index('status').getAll(IDBKeyRange.only('active')));
+      if (activeRows.length > 1) {
+        throw new App.errors.MultipleActiveWorkoutsError(activeRows);
+      }
+      if (activeRows.length === 1) {
+        throw new App.errors.ActiveWorkoutConflictError(activeRows[0]);
+      }
+
+      const rawSession = entry.sessionId ? await db.reqToPromise(sessionsStore.get(entry.sessionId)) : null;
+      const session = rawSession ? { ...rawSession, color: App.sessionColors.normalize(rawSession.color) } : null;
+
+      const workout = buildWorkoutRecord({
+        title: session ? session.name : 'Workout',
+        exerciseIds: session ? session.exercises : [],
+        sessionId: entry.sessionId,
+        date: entry.date
+      });
+      workoutsStore.put(workout);
+
       entry.workoutId = workout.id;
       entry.updatedAt = utils.nowISO();
-      await db.put('calendarEntries', entry);
-    }
+      entriesStore.put(entry);
 
-    return { entry, workout };
+      return { entry, workout };
+    });
   }
 
   // Backfills a past (or today's) workout directly as completed — it

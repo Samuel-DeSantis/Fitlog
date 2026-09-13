@@ -105,10 +105,24 @@ App.views = App.views || {};
     });
 
     container.querySelectorAll('[data-start-entry]').forEach((btn) => {
-      btn.addEventListener('click', async (e) => {
-        e.currentTarget.disabled = true;
-        const { workout } = await App.commands.startPlannedWorkout(btn.dataset.startEntry);
-        App.router.go('/workout/' + workout.id);
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          const { workout } = await App.commands.startPlannedWorkout(btn.dataset.startEntry);
+          App.router.go('/workout/' + workout.id);
+        } catch (err) {
+          if (err instanceof App.errors.ActiveWorkoutConflictError) {
+            btn.disabled = false;
+            alert(`You already have "${err.activeWorkout.title}" in progress. Finish or resume it before starting this workout.`);
+            return;
+          }
+          if (err instanceof App.errors.MultipleActiveWorkoutsError) {
+            alert('There\'s a data conflict with active workouts — resolve it below before starting this one.');
+            App.router.render();
+            return;
+          }
+          throw err;
+        }
       });
     });
   };
