@@ -4,9 +4,9 @@ App.commands = (function () {
   const db = App.db;
   const utils = App.utils;
 
-  async function createWorkout(opts) {
+  function buildWorkoutRecord(opts) {
     opts = opts || {};
-    const workout = {
+    return {
       id: utils.uuid(),
       sessionId: opts.sessionId || null,
       title: opts.title || 'Workout',
@@ -19,111 +19,153 @@ App.commands = (function () {
       createdAt: utils.nowISO(),
       updatedAt: utils.nowISO()
     };
+  }
+
+  // Unguarded primitive — always creates. Used internally by editing flows
+  // and directly by tests that need a workout regardless of active-state.
+  // The UI never calls this for "start a workout"; see resolveActiveWorkout.
+  async function createWorkout(opts) {
+    const workout = buildWorkoutRecord(opts);
     await db.put('workouts', workout);
     return workout;
   }
 
-  // The ONLY path the UI should use to start a workout. If an active
-  // workout already exists — including the double-tap/race case where two
-  // start actions fire before the first write lands — this resumes it
-  // instead of creating a duplicate.
+  // The atomic core of the active-workout invariant. The "is there already
+  // an active workout" check and the "create one" write happen inside a
+  // SINGLE IndexedDB transaction on the workouts store, so two concurrent
+  // calls cannot both see "no active workout" and both create one — the
+  // second transaction is serialized behind the first and sees its result.
+  //
+  // If more than one active workout is ever found (only possible from
+  // corrupted or pre-fix imported data, never from normal use now), this
+  // does NOT silently pick one or repair anything — it throws, and the
+  // caller is responsible for surfacing that explicitly.
+  async function resolveActiveWorkout(fields) {
+    return db.runTransaction(['workouts'], 'readwrite', async (tx) => {
+      const store = tx.objectStore('workouts');
+      const activeRows = await db.reqToPromise(store.index('status').getAll(IDBKeyRange.only('active')));
+      if (activeRows.length > 1) {
+        throw new App.errors.MultipleActiveWorkoutsError(activeRows);
+      }
+      if (activeRows.length === 1) return activeRows[0];
+      const workout = buildWorkoutRecord(fields);
+      store.put(workout);
+      return workout;
+    });
+  }
+
+  // The ONLY path the UI should use to start a workout.
   async function startWorkout(title, exerciseIds, sessionId) {
-    const active = await App.queries.getActiveWorkout();
-    if (active) return active;
-    return createWorkout({ title, exerciseIds, sessionId: sessionId || null });
+    return resolveActiveWorkout({ title, exerciseIds, sessionId: sessionId || null });
   }
 
   // Same exercise structure as the last completed workout. Copies NO
   // numbers — previous performance stays visible as reference only.
   async function repeatLastWorkout() {
-    const active = await App.queries.getActiveWorkout();
-    if (active) return active;
     const last = await App.queries.getLatestCompletedWorkout();
-    if (!last) return null;
-    return createWorkout({ title: last.title, exerciseIds: last.exerciseOrder, sessionId: last.sessionId });
+    if (!last) return App.queries.getActiveWorkout();
+    return resolveActiveWorkout({ title: last.title, exerciseIds: last.exerciseOrder, sessionId: last.sessionId });
   }
 
   async function startFromSession(session) {
-    const active = await App.queries.getActiveWorkout();
-    if (active) return active;
-    return createWorkout({ title: session.name, exerciseIds: session.exercises, sessionId: session.id });
+    return resolveActiveWorkout({ title: session.name, exerciseIds: session.exercises, sessionId: session.id });
   }
 
-  // Safety net for the rare true race where two startWorkout() reads both
-  // see "no active workout" before either write commits. Keeps the most
-  // recently started workout active, marks the rest completed — never
-  // deletes a set.
-  async function consolidateActiveWorkouts() {
-    const rows = await db.getAllByIndexRange('workouts', 'status', IDBKeyRange.only('active'));
-    if (rows.length <= 1) return { resolvedCount: 0 };
-    rows.sort((a, b) => (b.startedAt || '').localeCompare(a.startedAt || ''));
-    const extras = rows.slice(1);
-    for (const w of extras) {
-      w.status = 'completed';
-      w.endedAt = w.updatedAt || w.startedAt;
-      w.updatedAt = utils.nowISO();
-      await db.put('workouts', w);
-    }
-    return { resolvedCount: extras.length };
+  // Every command that modifies an existing workout goes through this: the
+  // read and the write happen inside ONE transaction, so the mutation is
+  // always applied to the current committed state — never to a snapshot
+  // fetched earlier via a separate db.get(). Without this, two commands
+  // firing close together (a re-render kicking off a new action before a
+  // prior one's write lands, or just fast double-tapping) could each read
+  // the same stale copy and the second write would silently discard the
+  // first's change. Concurrent transactions on the 'workouts' store are
+  // serialized by IndexedDB, so whichever runs second always sees the
+  // first's committed result.
+  async function mutateWorkout(workoutId, mutateFn) {
+    return db.runTransaction(['workouts'], 'readwrite', async (tx) => {
+      const store = tx.objectStore('workouts');
+      const workout = await db.reqToPromise(store.get(workoutId));
+      if (!workout) return null;
+      mutateFn(workout);
+      workout.updatedAt = utils.nowISO();
+      store.put(workout);
+      return workout;
+    });
   }
 
   async function addExerciseToWorkout(workoutId, exerciseId) {
-    const workout = await db.get('workouts', workoutId);
-    if (!workout) return null;
-    if (!workout.exerciseOrder.includes(exerciseId)) {
-      workout.exerciseOrder = [...workout.exerciseOrder, exerciseId];
-      workout.updatedAt = utils.nowISO();
-      await db.put('workouts', workout);
-    }
-    return workout;
+    return mutateWorkout(workoutId, (workout) => {
+      if (!workout.exerciseOrder.includes(exerciseId)) {
+        workout.exerciseOrder = [...workout.exerciseOrder, exerciseId];
+      }
+    });
   }
 
+  // Transactional: the workout's exerciseOrder update and the deletion of
+  // that exercise's sets commit together or not at all.
   async function removeExerciseFromWorkout(workoutId, exerciseId) {
-    const workout = await db.get('workouts', workoutId);
-    if (!workout) return null;
-    workout.exerciseOrder = workout.exerciseOrder.filter(id => id !== exerciseId);
-    workout.updatedAt = utils.nowISO();
-    await db.put('workouts', workout);
+    return db.runTransaction(['workouts', 'sets'], 'readwrite', async (tx) => {
+      const workoutStore = tx.objectStore('workouts');
+      const workout = await db.reqToPromise(workoutStore.get(workoutId));
+      if (!workout) return null;
+      workout.exerciseOrder = workout.exerciseOrder.filter(id => id !== exerciseId);
+      workout.updatedAt = utils.nowISO();
+      workoutStore.put(workout);
 
-    const sets = await App.queries.getSetsForWorkoutExercise(workoutId, exerciseId);
-    for (const s of sets) await db.remove('sets', s.id);
-    return workout;
+      const setsStore = tx.objectStore('sets');
+      const allSets = await db.reqToPromise(setsStore.index('workoutId').getAll(IDBKeyRange.only(workoutId)));
+      allSets.filter(s => s.exerciseId === exerciseId).forEach(s => setsStore.delete(s.id));
+
+      return workout;
+    });
   }
 
   async function reorderExercises(workoutId, orderedExerciseIds) {
-    const workout = await db.get('workouts', workoutId);
-    if (!workout) return null;
-    workout.exerciseOrder = [...orderedExerciseIds];
-    workout.updatedAt = utils.nowISO();
-    await db.put('workouts', workout);
-    return workout;
+    return mutateWorkout(workoutId, (workout) => {
+      workout.exerciseOrder = [...orderedExerciseIds];
+    });
   }
 
-  // Adds a blank set. Never pre-fills weight/reps from history — that
-  // would silently treat "what I did last time" as "what I did just now".
+  // Adds a set. If the exercise already has a set in this workout with
+  // valid weight/reps, copies the most recent such set's values as a
+  // starting point (looking backward past any incomplete/blank sets if
+  // needed) — but the new set is NEVER marked completed just because it
+  // has values; completedAt stays null until the user explicitly confirms
+  // it (either by editing a value, which re-triggers the normal
+  // completion rule below, or via setSetCompleted()).
+  // The read-scan-then-write is inside one transaction so two concurrent
+  // "add set" taps can't compute the same setOrder.
   async function addSet(workoutId, exerciseId) {
-    const existing = await App.queries.getSetsForWorkoutExercise(workoutId, exerciseId);
-    const set = {
-      id: utils.uuid(),
-      workoutId,
-      exerciseId,
-      setOrder: existing.length,
-      weight: null,
-      reps: null,
-      completedAt: null
-    };
-    await db.put('sets', set);
-    return set;
+    return db.runTransaction(['sets'], 'readwrite', async (tx) => {
+      const store = tx.objectStore('sets');
+      const forWorkout = await db.reqToPromise(store.index('workoutId').getAll(IDBKeyRange.only(workoutId)));
+      const forExercise = forWorkout.filter(s => s.exerciseId === exerciseId).sort((a, b) => a.setOrder - b.setOrder);
+
+      let copyWeight = null, copyReps = null;
+      for (let i = forExercise.length - 1; i >= 0; i--) {
+        const s = forExercise[i];
+        if (s.weight != null && s.reps != null) {
+          copyWeight = s.weight;
+          copyReps = s.reps;
+          break;
+        }
+      }
+
+      const set = {
+        id: utils.uuid(), workoutId, exerciseId, setOrder: forExercise.length,
+        weight: copyWeight, reps: copyReps, completedAt: null
+      };
+      store.put(set);
+      return set;
+    });
   }
 
-  async function copyToNewSet(workoutId, exerciseId, previousSet) {
-    const set = await addSet(workoutId, exerciseId);
-    return updateSet(set.id, { weight: previousSet.weight, reps: previousSet.reps });
-  }
-
-  // completedAt is derived, not assumed: it is set the instant a set has
-  // both weight and reps, and cleared if either is removed. Nothing else
-  // in the app is allowed to set it directly.
+  // completedAt is derived, not assumed: typing a value sets it the
+  // instant both weight and reps are present (this is what makes a
+  // freshly-typed blank set complete without a separate confirm step),
+  // and clears it if either is removed. A set that already had both
+  // values from being copied — untouched by the user — keeps whatever
+  // completedAt it had (null, until explicitly confirmed).
   async function updateSet(setId, fields) {
     const set = await db.get('sets', setId);
     if (!set) return null;
@@ -134,8 +176,22 @@ App.commands = (function () {
     return set;
   }
 
+  // Explicit confirm/un-confirm — the only way a set with copied-but-
+  // untouched values becomes completed without the user re-typing them.
+  // Can't complete a set that's missing weight or reps.
+  async function setSetCompleted(setId, completed) {
+    const set = await db.get('sets', setId);
+    if (!set) return null;
+    if (completed && (set.weight == null || set.reps == null)) return set;
+    set.completedAt = completed ? (set.completedAt || utils.nowISO()) : null;
+    await db.put('sets', set);
+    return set;
+  }
+
+  // The authoritative completion check — completedAt, not merely "has
+  // values", since a copied set can have both without being confirmed.
   function isSetCompleted(set) {
-    return set.weight != null && set.reps != null;
+    return set.completedAt != null;
   }
 
   async function deleteSet(setId) {
@@ -143,27 +199,27 @@ App.commands = (function () {
   }
 
   async function finishWorkout(workoutId) {
-    const workout = await db.get('workouts', workoutId);
-    if (!workout) return null;
-    workout.status = 'completed';
-    workout.endedAt = utils.nowISO();
-    workout.updatedAt = utils.nowISO();
-    await db.put('workouts', workout);
-    return workout;
+    return mutateWorkout(workoutId, (workout) => {
+      workout.status = 'completed';
+      workout.endedAt = utils.nowISO();
+    });
   }
 
   async function editWorkoutMeta(workoutId, fields) {
-    const workout = await db.get('workouts', workoutId);
-    if (!workout) return null;
-    Object.assign(workout, fields, { updatedAt: utils.nowISO() });
-    await db.put('workouts', workout);
-    return workout;
+    return mutateWorkout(workoutId, (workout) => {
+      Object.assign(workout, fields);
+    });
   }
 
+  // Transactional: sets and the workout row are deleted together, or not
+  // at all — no partially-deleted state possible.
   async function deleteWorkout(workoutId) {
-    const sets = await App.queries.getSetsForWorkout(workoutId);
-    for (const s of sets) await db.remove('sets', s.id);
-    await db.remove('workouts', workoutId);
+    await db.runTransaction(['workouts', 'sets'], 'readwrite', async (tx) => {
+      const setsStore = tx.objectStore('sets');
+      const sets = await db.reqToPromise(setsStore.index('workoutId').getAll(IDBKeyRange.only(workoutId)));
+      sets.forEach(s => setsStore.delete(s.id));
+      tx.objectStore('workouts').delete(workoutId);
+    });
   }
 
   async function createExercise(name) {
@@ -183,8 +239,12 @@ App.commands = (function () {
     return ex;
   }
 
-  async function createSession(name, exerciseIds) {
-    const session = { id: utils.uuid(), name, exercises: [...exerciseIds], createdAt: utils.nowISO(), updatedAt: utils.nowISO() };
+  async function createSession(name, exerciseIds, color) {
+    const session = {
+      id: utils.uuid(), name, exercises: [...exerciseIds],
+      color: App.sessionColors.normalize(color),
+      createdAt: utils.nowISO(), updatedAt: utils.nowISO()
+    };
     await db.put('sessions', session);
     return session;
   }
@@ -192,13 +252,98 @@ App.commands = (function () {
   async function updateSession(id, fields) {
     const session = await db.get('sessions', id);
     if (!session) return null;
-    Object.assign(session, fields, { updatedAt: utils.nowISO() });
+    Object.assign(session, fields);
+    if ('color' in fields) session.color = App.sessionColors.normalize(fields.color);
+    session.updatedAt = utils.nowISO();
     await db.put('sessions', session);
     return session;
   }
 
   async function deleteSession(id) {
     await db.remove('sessions', id);
+  }
+
+  // Creates a planned occurrence — NOT a Workout. Multiple plans on the
+  // same date, and a plan coexisting with completed workouts on the same
+  // date, are both fine; there's no active-workout-style invariant here.
+  async function planCalendarEntry(date, sessionId) {
+    const entry = {
+      id: utils.uuid(), date, sessionId: sessionId || null, workoutId: null,
+      createdAt: utils.nowISO(), updatedAt: utils.nowISO()
+    };
+    await db.put('calendarEntries', entry);
+    return entry;
+  }
+
+  async function updateCalendarEntry(id, fields) {
+    const entry = await db.get('calendarEntries', id);
+    if (!entry) return null;
+    Object.assign(entry, fields, { updatedAt: utils.nowISO() });
+    await db.put('calendarEntries', entry);
+    return entry;
+  }
+
+  // Only removes the plan record itself — never touches the Session it
+  // references or any workout it may have produced. Cancelling a plan
+  // must not be able to delete either of those.
+  async function deleteCalendarEntry(id) {
+    await db.remove('calendarEntries', id);
+  }
+
+  // Starts (or resumes) the Workout for a planned Calendar Entry, without
+  // ever creating a second one for the same entry:
+  //  - If the entry is already linked to a workout that still exists,
+  //    that link is authoritative — just return it (covers "tapped Start,
+  //    navigated away, came back and tapped Start again").
+  //  - Otherwise resolve/create via the same guarded path every other
+  //    "start a workout" action uses, then record the link.
+  // The new workout is dated to match the entry's planned date (not
+  // "today"), so the calendar dot for that date simply flips from hollow
+  // to filled in place, matching what the user planned regardless of the
+  // exact moment they actually pressed Start.
+  async function startPlannedWorkout(calendarEntryId) {
+    const entry = await db.get('calendarEntries', calendarEntryId);
+    if (!entry) return null;
+
+    if (entry.workoutId) {
+      const existing = await db.get('workouts', entry.workoutId);
+      if (existing) return { entry, workout: existing };
+    }
+
+    const session = entry.sessionId ? await App.queries.getSession(entry.sessionId) : null;
+    const workout = await resolveActiveWorkout({
+      title: session ? session.name : 'Workout',
+      exerciseIds: session ? session.exercises : [],
+      sessionId: entry.sessionId,
+      date: entry.date
+    });
+
+    if (entry.workoutId !== workout.id) {
+      entry.workoutId = workout.id;
+      entry.updatedAt = utils.nowISO();
+      await db.put('calendarEntries', entry);
+    }
+
+    return { entry, workout };
+  }
+
+  // Backfills a past (or today's) workout directly as completed — it
+  // never touches the active-workout slot, so it can be created even
+  // while a different workout is currently active. Reuses the same
+  // workout screen for data entry: once created, it opens exactly like
+  // editing any other completed workout.
+  async function backfillWorkout(date, sessionId) {
+    const session = sessionId ? await App.queries.getSession(sessionId) : null;
+    const workout = buildWorkoutRecord({
+      title: session ? session.name : 'Workout',
+      exerciseIds: session ? session.exercises : [],
+      sessionId: sessionId || null,
+      date
+    });
+    workout.status = 'completed';
+    workout.endedAt = workout.startedAt;
+    await db.put('workouts', workout);
+    return workout;
   }
 
   async function setUnit(unit) {
@@ -216,12 +361,13 @@ App.commands = (function () {
   }
 
   return {
-    createWorkout, startWorkout, repeatLastWorkout, startFromSession, consolidateActiveWorkouts,
+    createWorkout, startWorkout, repeatLastWorkout, startFromSession,
     addExerciseToWorkout, removeExerciseFromWorkout, reorderExercises,
-    addSet, copyToNewSet, updateSet, isSetCompleted, deleteSet,
+    addSet, updateSet, isSetCompleted, setSetCompleted, deleteSet,
     finishWorkout, editWorkoutMeta, deleteWorkout,
     createExercise, archiveExercise,
     createSession, updateSession, deleteSession,
+    planCalendarEntry, updateCalendarEntry, deleteCalendarEntry, startPlannedWorkout, backfillWorkout,
     setUnit, setBodyweight
   };
 })();

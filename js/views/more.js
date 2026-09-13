@@ -30,7 +30,7 @@ App.views = App.views || {};
         <div id="exercise-list">
           ${exercises.map(e => `
             <div class="list-row">
-              <div class="list-row-title">${e.name}</div>
+              <div class="list-row-title">${App.utils.escapeHtml(e.name)}</div>
               <button class="list-row-action danger" data-archive="${e.id}">Archive</button>
             </div>
           `).join('')}

@@ -27,9 +27,9 @@ App.router = (function () {
     content.scrollTop = 0;
   }
 
-  function init() {
+  async function init() {
     window.addEventListener('hashchange', render);
-    render();
+    await render();
   }
 
   function go(path) {

@@ -352,6 +352,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 
 .set-header-row .set-index-col { width: 22px; flex: none; }
 .set-header-row .set-input-col { flex: 1; }
+.set-header-row .set-check-col { width: 32px; flex: none; }
 .set-header-row .set-end-col { width: 30px; flex: none; }
 
 .set-rows { display: flex; flex-direction: column; gap: var(--space-2); }
@@ -382,6 +383,30 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 
 .set-row-planned input { border-style: dashed; color: var(--text-muted); }
+
+.set-check {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-faint);
+  border: 1.5px solid var(--border-strong);
+  border-radius: 50%;
+}
+
+.set-check-on {
+  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.set-check:disabled {
+  opacity: 0.35;
+}
 
 .set-remove {
   flex: none;
@@ -537,6 +562,174 @@ button:disabled { opacity: 0.5; cursor: default; }
   background: var(--text);
   color: var(--bg);
 }
+
+/* ---------------------------------------------
+   Session colors — swatch picker + small dots
+--------------------------------------------- */
+.color-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: 4px;
+}
+
+.color-swatch {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  flex: none;
+}
+
+.color-swatch-selected {
+  border-color: var(--text);
+}
+
+.color-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 8px;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+}
+
+.color-dot-hollow {
+  background: var(--bg) !important;
+  border: 2px solid;
+  border-color: var(--dot-color, var(--text-faint));
+}
+
+/* ---------------------------------------------
+   Calendar month grid
+--------------------------------------------- */
+.calendar-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+
+.calendar-nav-btn {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  border: 1.5px solid var(--border-strong);
+  border-radius: 50%;
+}
+
+.calendar-month-heading {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: var(--space-2);
+}
+
+.calendar-weekdays span {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-faint);
+  text-transform: uppercase;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.calendar-day {
+  aspect-ratio: 1;
+  min-height: 46px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 3px;
+  padding-top: 6px;
+  border-radius: var(--radius-control);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.calendar-day:active { background: var(--surface); }
+
+.calendar-day.is-today {
+  background: var(--accent-soft);
+  font-weight: 800;
+}
+
+.calendar-day-empty { visibility: hidden; }
+
+.calendar-dots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 3px;
+  max-width: 32px;
+}
+
+.calendar-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.calendar-dot-hollow {
+  background: var(--bg);
+  border: 1.5px solid;
+}
+
+/* ---------------------------------------------
+   Day-detail sheet
+--------------------------------------------- */
+.day-occurrence {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.day-occurrence:last-of-type { border-bottom: none; }
+
+.day-occurrence-title {
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+}
+
+.day-occurrence-state {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 2px 0 var(--space-2);
+}
+
+.day-occurrence-actions {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.day-occurrence-actions button {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.day-occurrence-actions button.danger { color: var(--danger); }
 
 /* ---------------------------------------------
    Placeholder screens (Progress in Phase 1)

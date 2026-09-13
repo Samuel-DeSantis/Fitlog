@@ -2,7 +2,7 @@ window.App = window.App || {};
 
 App.db = (function () {
   const DB_NAME = 'fitlog_v2';
-  const DB_VERSION = 1;
+  const DB_VERSION = 2;
   const FORMAT_VERSION = 1;
   const STORES = ['exercises', 'sessions', 'workouts', 'sets', 'calendarEntries', 'settings'];
 
@@ -15,6 +15,8 @@ App.db = (function () {
 
       req.onupgradeneeded = (e) => {
         const db = e.target.result;
+        const tx = e.target.transaction;
+        const oldVersion = e.oldVersion;
 
         if (!db.objectStoreNames.contains('exercises')) {
           const s = db.createObjectStore('exercises', { keyPath: 'id' });
@@ -41,9 +43,25 @@ App.db = (function () {
         if (!db.objectStoreNames.contains('settings')) {
           db.createObjectStore('settings', { keyPath: 'id' });
         }
-        // Future schema changes: branch on e.oldVersion here, same pattern
-        // as this project's previous v1->v2 migration. No migration needed
-        // yet — this is version 1 of a fresh schema.
+
+        // v1 -> v2: Sessions gained a `color` field for Calendar dots.
+        // Existing sessions predate this and have no color — backfill a
+        // default so nothing renders with an undefined color. No stores
+        // change shape otherwise, and no existing data is touched beyond
+        // this one additive field.
+        if (oldVersion > 0 && oldVersion < 2) {
+          const sessionsStore = tx.objectStore('sessions');
+          sessionsStore.openCursor().onsuccess = (ev) => {
+            const cursor = ev.target.result;
+            if (!cursor) return;
+            const session = cursor.value;
+            if (!session.color) {
+              session.color = 'gray';
+              cursor.update(session);
+            }
+            cursor.continue();
+          };
+        }
       };
 
       req.onsuccess = (e) => resolve(e.target.result);
@@ -57,6 +75,26 @@ App.db = (function () {
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);
     });
+  }
+
+  // Generic escape hatch for compound operations that must be atomic
+  // (e.g. "check for an active workout and create one if not" or "delete
+  // a workout and its sets together"). `work` receives the raw transaction
+  // so the caller can issue multiple requests against it using
+  // reqToPromise(); they either all commit together or the whole
+  // transaction aborts. This is the ONLY place multi-store atomicity is
+  // implemented — callers never manage transactions themselves beyond this.
+  async function runTransaction(storeNames, mode, work) {
+    const database = await open();
+    const tx = database.transaction(storeNames, mode);
+    const donePromise = new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error || new Error('Transaction aborted'));
+    });
+    const result = await work(tx);
+    await donePromise;
+    return result;
   }
 
   async function put(store, value) {
@@ -149,7 +187,8 @@ App.db = (function () {
 
   // Validates fully before making any change. In 'replace' mode, existing
   // data is only cleared after validation passes — a bad file is rejected,
-  // never silently destructive.
+  // never silently destructive. The clear + every store's writes happen in
+  // ONE transaction: if anything fails partway, nothing is left half-applied.
   async function importAll(data, mode) {
     mode = mode || 'merge';
     const { valid, errors } = validateImportPayload(data);
@@ -158,25 +197,24 @@ App.db = (function () {
       err.details = errors;
       throw err;
     }
-    if (mode === 'replace') await clearAll();
 
-    const db = await open();
-    for (const s of STORES) {
-      const records = data.stores[s];
-      if (!Array.isArray(records)) continue;
-      const t = db.transaction([s], 'readwrite');
-      const os = t.objectStore(s);
-      records.forEach(item => os.put(item));
-      await new Promise((resolve, reject) => {
-        t.oncomplete = resolve;
-        t.onerror = () => reject(t.error);
-      });
-    }
+    await runTransaction(STORES, 'readwrite', async (tx) => {
+      if (mode === 'replace') {
+        for (const s of STORES) tx.objectStore(s).clear();
+      }
+      for (const s of STORES) {
+        const records = data.stores[s];
+        if (!Array.isArray(records)) continue;
+        const os = tx.objectStore(s);
+        for (const item of records) os.put(item);
+      }
+    });
   }
 
   return {
     open, put, get, getAll, getAllByIndexRange, remove, clearAll,
-    exportAll, importAll, validateImportPayload, STORES, FORMAT_VERSION
+    exportAll, importAll, validateImportPayload, STORES, FORMAT_VERSION,
+    reqToPromise, runTransaction
   };
 })();
 

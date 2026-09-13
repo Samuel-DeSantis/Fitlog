@@ -53,6 +53,32 @@ App.utils = (function () {
     return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
   }
 
+  // All month math below uses the new Date(year, month, day) constructor,
+  // which is ALWAYS local-time — never toISOString()/UTC — consistent
+  // with localISOFromDate() above. This is what keeps month navigation
+  // and day-in-month indexing correct across timezones and DST changes.
+  function daysInMonth(year, month0) {
+    return new Date(year, month0 + 1, 0).getDate();
+  }
+
+  function formatMonthHeading(year, month0) {
+    return new Date(year, month0, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  }
+
+  // 0 (Sunday) - 6 (Saturday), local time.
+  function firstWeekdayOfMonth(year, month0) {
+    return new Date(year, month0, 1).getDay();
+  }
+
+  function addMonthsLocal(year, month0, delta) {
+    const d = new Date(year, month0 + delta, 1);
+    return { year: d.getFullYear(), month: d.getMonth() };
+  }
+
+  function dateAtLocal(year, month0, day) {
+    return localISOFromDate(new Date(year, month0, day));
+  }
+
   function formatTime(isoStr) {
     if (!isoStr) return '';
     return new Date(isoStr).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
@@ -78,9 +104,24 @@ App.utils = (function () {
     return t.content.firstElementChild;
   }
 
+  // Every place a user-entered string (exercise/session names, workout
+  // titles, notes) is interpolated into an innerHTML template must run
+  // through this first — both as text content and inside quoted
+  // attributes, since we consistently use double quotes for attributes.
+  function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   return {
     uuid, todayLocalISO, daysAgoISO, nowISO, localISOFromDate,
-    formatDateLabel, formatDateHeading, formatTime, estimate1RM, debounce, el
+    formatDateLabel, formatDateHeading, formatTime, estimate1RM, debounce, el, escapeHtml,
+    daysInMonth, formatMonthHeading, firstWeekdayOfMonth, addMonthsLocal, dateAtLocal
   };
 })();
 

@@ -3,17 +3,27 @@ App.views = App.views || {};
 
 (function () {
   App.views.train = async function (container) {
-    const [activeWorkout, sessions] = await Promise.all([
-      App.queries.getActiveWorkout(),
-      App.queries.getSessions()
-    ]);
+    let activeWorkout, sessions;
+    try {
+      [activeWorkout, sessions] = await Promise.all([
+        App.queries.getActiveWorkout(),
+        App.queries.getSessions()
+      ]);
+    } catch (err) {
+      if (err instanceof App.errors.MultipleActiveWorkoutsError) {
+        container.innerHTML = `<div class="view-header"><h1>Train</h1></div>${App.ui.conflictPanelHtml(err)}`;
+        App.ui.wireConflictPanel(container);
+        return;
+      }
+      throw err;
+    }
 
     let bannerHtml = '';
     if (activeWorkout) {
       bannerHtml = `
         <div class="active-banner">
           <div class="active-banner-label">Workout in progress</div>
-          <div class="active-banner-title">${activeWorkout.title}</div>
+          <div class="active-banner-title">${App.utils.escapeHtml(activeWorkout.title)}</div>
           <button class="btn-primary" id="resume-btn">Resume Workout</button>
         </div>
       `;
@@ -27,7 +37,7 @@ App.views = App.views || {};
         ${sessions.length ? sessions.map(s => `
           <div class="list-row">
             <div>
-              <div class="list-row-title">${s.name}</div>
+              <div class="list-row-title"><span class="color-dot color-dot-filled" style="background:${App.sessionColors.hexFor(s.color)}"></span>${App.utils.escapeHtml(s.name)}</div>
               <div class="list-row-sub">${s.exercises.length} exercise${s.exercises.length === 1 ? '' : 's'}</div>
             </div>
             <div class="list-row-right">
@@ -85,6 +95,7 @@ App.views = App.views || {};
     const exerciseMap = Object.fromEntries(exercises.map(e => [e.id, e]));
     let name = existingSession ? existingSession.name : '';
     let orderedIds = existingSession ? [...existingSession.exercises] : [];
+    let selectedColor = App.sessionColors.normalize(existingSession ? existingSession.color : null);
 
     const overlay = App.utils.el(`
       <div class="modal-overlay">
@@ -94,7 +105,8 @@ App.views = App.views || {};
             <button class="modal-close">×</button>
           </div>
           <div class="modal-form">
-            <label>Name<input type="text" id="session-name" value="${name}" placeholder="Upper Body"></label>
+            <label>Name<input type="text" id="session-name" value="${App.utils.escapeHtml(name)}" placeholder="Upper Body"></label>
+            <label>Calendar color<div id="session-color-swatches" class="color-swatches"></div></label>
             <div id="session-exercise-list"></div>
             <button class="btn-secondary" id="session-add-exercise" type="button">+ Add Exercise</button>
             <button class="btn-primary" id="session-save" type="button">Save</button>
@@ -104,6 +116,21 @@ App.views = App.views || {};
     `);
     document.body.appendChild(overlay);
 
+    function renderSwatches() {
+      const el = overlay.querySelector('#session-color-swatches');
+      el.innerHTML = App.sessionColors.PALETTE.map(c => `
+        <button type="button" class="color-swatch ${c.key === selectedColor ? 'color-swatch-selected' : ''}"
+          style="background:${c.hex}" data-color="${c.key}" aria-label="${c.label}"></button>
+      `).join('');
+      el.querySelectorAll('.color-swatch').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          selectedColor = btn.dataset.color;
+          renderSwatches();
+        });
+      });
+    }
+    renderSwatches();
+
     function renderExerciseList() {
       const listEl = overlay.querySelector('#session-exercise-list');
       listEl.innerHTML = orderedIds.map((id, i) => {
@@ -111,7 +138,7 @@ App.views = App.views || {};
         if (!ex) return '';
         return `
           <div class="list-row" data-id="${id}">
-            <div class="list-row-title">${i + 1}. ${ex.name}</div>
+            <div class="list-row-title">${i + 1}. ${App.utils.escapeHtml(ex.name)}</div>
             <div class="list-row-right">
               <button class="list-row-action" data-move-up="${id}" ${i === 0 ? 'disabled' : ''}>↑</button>
               <button class="list-row-action" data-move-down="${id}" ${i === orderedIds.length - 1 ? 'disabled' : ''}>↓</button>
@@ -159,9 +186,9 @@ App.views = App.views || {};
       if (!nameValue) { alert('Give the session a name.'); return; }
       if (!orderedIds.length) { alert('Add at least one exercise.'); return; }
       if (existingSession) {
-        await App.commands.updateSession(existingSession.id, { name: nameValue, exercises: orderedIds });
+        await App.commands.updateSession(existingSession.id, { name: nameValue, exercises: orderedIds, color: selectedColor });
       } else {
-        await App.commands.createSession(nameValue, orderedIds);
+        await App.commands.createSession(nameValue, orderedIds, selectedColor);
       }
       overlay.remove();
       App.router.render();

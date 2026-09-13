@@ -7,11 +7,13 @@ App.queries = (function () {
     return db.get('workouts', id);
   }
 
+  // Returns the single active workout, or null if there is none. Throws
+  // MultipleActiveWorkoutsError if the invariant is somehow violated —
+  // never silently picks one, since that would be an undetected repair.
   async function getActiveWorkout() {
     const rows = await db.getAllByIndexRange('workouts', 'status', IDBKeyRange.only('active'));
-    if (!rows.length) return null;
-    rows.sort((a, b) => (b.startedAt || '').localeCompare(a.startedAt || ''));
-    return rows[0];
+    if (rows.length > 1) throw new App.errors.MultipleActiveWorkoutsError(rows);
+    return rows[0] || null;
   }
 
   async function getLatestCompletedWorkout() {
@@ -76,12 +78,44 @@ App.queries = (function () {
     return includeArchived ? all : all.filter(e => !e.archived);
   }
 
+  // Every read normalizes color defensively (pre-color-feature sessions,
+  // or imported data that lacks it) — callers never see an invalid color.
   async function getSessions() {
-    return db.getAll('sessions');
+    const rows = await db.getAll('sessions');
+    return rows.map(s => ({ ...s, color: App.sessionColors.normalize(s.color) }));
   }
 
   async function getSession(id) {
-    return db.get('sessions', id);
+    const s = await db.get('sessions', id);
+    return s ? { ...s, color: App.sessionColors.normalize(s.color) } : s;
+  }
+
+  async function getCalendarEntry(id) {
+    return db.get('calendarEntries', id);
+  }
+
+  async function getCalendarEntriesInRange(startDate, endDate) {
+    const rows = await db.getAllByIndexRange('calendarEntries', 'date', IDBKeyRange.bound(startDate, endDate));
+    return rows.sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  // Pairs each calendar entry in range with its linked workout (if any),
+  // resolving that lookup once here instead of in every view that needs
+  // "is this entry planned, active, or completed". A dangling workoutId
+  // (its workout was deleted) resolves to null, not an error — the entry
+  // then reads as "planned" again, which is the correct fallback.
+  async function getCalendarEntriesWithWorkouts(startDate, endDate) {
+    const entries = await getCalendarEntriesInRange(startDate, endDate);
+    const workouts = await Promise.all(entries.map(e => e.workoutId ? db.get('workouts', e.workoutId) : null));
+    return entries.map((entry, i) => ({ entry, workout: workouts[i] || null }));
+  }
+
+  // 'planned' (no workout yet, or its workout was deleted), 'active', or
+  // 'completed' — always derived from the linked workout's real status,
+  // never stored redundantly on the entry itself, so it can't drift out
+  // of sync with the workout it represents.
+  function calendarEntryStatus(entryWithWorkout) {
+    return entryWithWorkout.workout ? entryWithWorkout.workout.status : 'planned';
   }
 
   async function getSettings() {
@@ -93,7 +127,8 @@ App.queries = (function () {
     getCompletedWorkoutsInRange, getAllCompletedWorkouts,
     getSetsForWorkout, getSetsForWorkoutExercise,
     getExerciseHistory, getPreviousPerformance,
-    getExercises, getSessions, getSession, getSettings
+    getExercises, getSessions, getSession, getSettings,
+    getCalendarEntry, getCalendarEntriesInRange, getCalendarEntriesWithWorkouts, calendarEntryStatus
   };
 })();
 

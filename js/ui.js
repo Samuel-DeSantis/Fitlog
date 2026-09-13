@@ -28,7 +28,7 @@ App.ui = (function () {
       const f = (filter || '').toLowerCase();
       const filtered = exercises.filter(e => e.name.toLowerCase().includes(f));
       listEl.innerHTML = filtered.map(e => `
-        <button class="modal-list-item" data-id="${e.id}"><span>${e.name}</span></button>
+        <button class="modal-list-item" data-id="${e.id}"><span>${App.utils.escapeHtml(e.name)}</span></button>
       `).join('') || '<p class="empty-hint">No matches</p>';
       listEl.querySelectorAll('.modal-list-item').forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -44,5 +44,34 @@ App.ui = (function () {
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
   }
 
-  return { openExercisePicker };
+  // Renders an explicit, non-destructive panel when the active-workout
+  // invariant is violated (MultipleActiveWorkoutsError). Nothing is
+  // auto-repaired — each workout links to the normal workout screen so the
+  // user can finish or delete extras themselves.
+  function conflictPanelHtml(err) {
+    const rows = err.workouts.map(w => `
+      <button class="list-row" data-conflict-id="${App.utils.escapeHtml(w.id)}">
+        <div>
+          <div class="list-row-title">${App.utils.escapeHtml(w.title)}</div>
+          <div class="list-row-sub">${App.utils.escapeHtml(w.date)} · started ${App.utils.escapeHtml(App.utils.formatTime(w.startedAt))}</div>
+        </div>
+        <div class="list-row-right list-row-action">Open</div>
+      </button>
+    `).join('');
+    return `
+      <div class="section">
+        <h2>Data conflict</h2>
+        <p class="section-note">Found ${err.workouts.length} workouts marked active at the same time — there should only ever be one. Nothing has been changed or deleted. Open each one below and finish or delete it until only one remains active.</p>
+        ${rows}
+      </div>
+    `;
+  }
+
+  function wireConflictPanel(container) {
+    container.querySelectorAll('[data-conflict-id]').forEach((btn) => {
+      btn.addEventListener('click', () => App.router.go('/workout/' + btn.dataset.conflictId));
+    });
+  }
+
+  return { openExercisePicker, conflictPanelHtml, wireConflictPanel };
 })();

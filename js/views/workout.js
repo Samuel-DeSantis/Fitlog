@@ -36,7 +36,7 @@ App.views = App.views || {};
     container.innerHTML = `
       <div class="view-header">
         <button class="back-btn" id="back-btn">‹ ${isActive ? 'Train' : 'Calendar'}</button>
-        <h1>${workout.title}</h1>
+        <h1>${App.utils.escapeHtml(workout.title)}</h1>
         <p class="view-subhead">
           ${App.utils.formatDateLabel(workout.date)}${isActive ? ' · in progress' : ''}
           <button class="list-row-action" id="edit-meta-btn">Edit details</button>
@@ -91,11 +91,11 @@ App.views = App.views || {};
     return `
       <div class="exercise-block" data-exercise="${ex.id}">
         <div class="exercise-block-header">
-          <div class="exercise-name">${ex.name}</div>
+          <div class="exercise-name">${App.utils.escapeHtml(ex.name)}</div>
           <button class="exercise-remove" data-exercise="${ex.id}">Remove</button>
         </div>
         ${prevText ? `<div class="exercise-previous">Previous: ${prevText}</div>` : ''}
-        ${rows ? `<div class="set-header-row"><span class="set-index-col"></span><span class="set-input-col">Weight</span><span class="set-input-col">Reps</span><span class="set-end-col"></span></div>` : ''}
+        ${rows ? `<div class="set-header-row"><span class="set-index-col"></span><span class="set-input-col">Weight</span><span class="set-input-col">Reps</span><span class="set-check-col"></span><span class="set-end-col"></span></div>` : ''}
         <div class="set-rows">${rows}</div>
         <button class="btn-add-set" data-exercise="${ex.id}">+ Add Set</button>
       </div>
@@ -104,11 +104,15 @@ App.views = App.views || {};
 
   function setRowHtml(set, index) {
     const complete = App.commands.isSetCompleted(set);
+    const hasValues = set.weight != null && set.reps != null;
     return `
       <div class="set-row ${complete ? '' : 'set-row-planned'}" data-set="${set.id}">
         <span class="set-index">${index + 1}</span>
         <input type="number" inputmode="decimal" class="set-weight" value="${set.weight != null ? set.weight : ''}" placeholder="0">
         <input type="number" inputmode="numeric" class="set-reps" value="${set.reps != null ? set.reps : ''}" placeholder="0">
+        <button class="set-check ${complete ? 'set-check-on' : ''}" data-set-check
+          aria-label="${complete ? 'Mark set not done' : 'Mark set done'}" ${hasValues ? '' : 'disabled'}
+        >${complete ? '✓' : ''}</button>
         <button class="set-remove" aria-label="Remove set">×</button>
       </div>
     `;
@@ -122,7 +126,7 @@ App.views = App.views || {};
         const block = btn.closest('.exercise-block');
         let header = block.querySelector('.set-header-row');
         if (!header) {
-          header = App.utils.el('<div class="set-header-row"><span class="set-index-col"></span><span class="set-input-col">Weight</span><span class="set-input-col">Reps</span><span class="set-end-col"></span></div>');
+          header = App.utils.el('<div class="set-header-row"><span class="set-index-col"></span><span class="set-input-col">Weight</span><span class="set-input-col">Reps</span><span class="set-check-col"></span><span class="set-end-col"></span></div>');
           block.querySelector('.set-rows').before(header);
         }
         const index = block.querySelectorAll('.set-row').length;
@@ -143,21 +147,42 @@ App.views = App.views || {};
     container.querySelectorAll('.set-row').forEach((row) => wireSetRow(row));
   }
 
+  function applySetRowState(row, set) {
+    const complete = App.commands.isSetCompleted(set);
+    const hasValues = set.weight != null && set.reps != null;
+    row.classList.toggle('set-row-planned', !complete);
+    const checkBtn = row.querySelector('[data-set-check]');
+    checkBtn.classList.toggle('set-check-on', complete);
+    checkBtn.textContent = complete ? '✓' : '';
+    checkBtn.disabled = !hasValues;
+    checkBtn.setAttribute('aria-label', complete ? 'Mark set not done' : 'Mark set done');
+  }
+
   function wireSetRow(row) {
     const setId = row.dataset.set;
     const weightInput = row.querySelector('.set-weight');
     const repsInput = row.querySelector('.set-reps');
     const removeBtn = row.querySelector('.set-remove');
+    const checkBtn = row.querySelector('[data-set-check]');
 
     const save = App.utils.debounce(async () => {
       const weight = weightInput.value !== '' ? parseFloat(weightInput.value) : null;
       const reps = repsInput.value !== '' ? parseInt(repsInput.value, 10) : null;
       const updated = await App.commands.updateSet(setId, { weight, reps });
-      row.classList.toggle('set-row-planned', !App.commands.isSetCompleted(updated));
+      applySetRowState(row, updated);
     }, 300);
 
     weightInput.addEventListener('input', save);
     repsInput.addEventListener('input', save);
+
+    // Explicit confirm/un-confirm — the only way a set with copied-but-
+    // untouched values becomes "done" without retyping the same numbers.
+    checkBtn.addEventListener('click', async () => {
+      const current = await App.db.get('sets', setId);
+      if (!current) return;
+      const updated = await App.commands.setSetCompleted(setId, !App.commands.isSetCompleted(current));
+      applySetRowState(row, updated);
+    });
 
     removeBtn.addEventListener('click', async () => {
       await App.commands.deleteSet(setId);
@@ -173,9 +198,9 @@ App.views = App.views || {};
             <button class="modal-close">×</button>
           </div>
           <form class="modal-form" id="meta-form">
-            <label>Title<input type="text" id="mf-title" value="${workout.title}"></label>
-            <label>Date<input type="date" id="mf-date" value="${workout.date}"></label>
-            <label>Notes<textarea id="mf-notes" rows="3">${workout.notes || ''}</textarea></label>
+            <label>Title<input type="text" id="mf-title" value="${App.utils.escapeHtml(workout.title)}"></label>
+            <label>Date<input type="date" id="mf-date" value="${App.utils.escapeHtml(workout.date)}"></label>
+            <label>Notes<textarea id="mf-notes" rows="3">${App.utils.escapeHtml(workout.notes || '')}</textarea></label>
             <button type="submit" class="btn-primary">Save</button>
           </form>
         </div>
