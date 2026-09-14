@@ -644,6 +644,22 @@ button:disabled { opacity: 0.5; cursor: default; }
 /* ---------------------------------------------
    Calendar — vertical scroll of stacked months
 --------------------------------------------- */
+
+/* Pinned to the top of the viewport while the month grid scrolls
+   underneath it — an opaque background so scrolled-past dates disappear
+   cleanly behind it rather than showing through. */
+.calendar-sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg);
+  padding-top: var(--space-3);
+}
+
+.calendar-sticky-header .view-header {
+  margin-bottom: var(--space-3);
+}
+
 .calendar-month-heading {
   font-size: 16px;
   font-weight: 800;

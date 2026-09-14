@@ -50,8 +50,10 @@ App.views = App.views || {};
       .join('');
 
     container.innerHTML = `
-      <div class="view-header"><h1>Calendar · ${currentYear}</h1></div>
-      <div class="calendar-weekdays">${weekdayLabels.map(d => `<span>${d}</span>`).join('')}</div>
+      <div class="calendar-sticky-header">
+        <div class="view-header"><h1>Calendar · ${currentYear}</h1></div>
+        <div class="calendar-weekdays">${weekdayLabels.map(d => `<span>${d}</span>`).join('')}</div>
+      </div>
       <div class="calendar-scroll" id="calendar-scroll">${monthBlocksHtml}</div>
     `;
 

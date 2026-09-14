@@ -198,3 +198,20 @@ test('Calendar QA: header shows the current year, day-detail heading uses compac
   assert.equal(dayHeading, App.utils.formatDateCompact(todayStr));
   assert.match(dayHeading, /^[A-Za-z]{3} · [A-Za-z]{3} \d{1,2}$/);
 });
+
+test('Calendar QA: header and weekday row are wrapped in the sticky container', async () => {
+  const { document } = await bootRealApp();
+  document.location.hash = '/calendar';
+  await wait(30);
+
+  const stickyHeader = document.querySelector('.calendar-sticky-header');
+  assert.ok(stickyHeader, 'a sticky header wrapper should exist');
+  assert.ok(stickyHeader.querySelector('.view-header h1'), 'the page heading should be inside the sticky wrapper');
+  assert.ok(stickyHeader.querySelector('.calendar-weekdays'), 'the weekday labels should be inside the sticky wrapper');
+
+  // The scrolling month content must be a SIBLING of the sticky header,
+  // not nested inside it, or it would scroll away together with it.
+  const scrollArea = document.getElementById('calendar-scroll');
+  assert.ok(scrollArea, 'the scrolling months container should exist');
+  assert.equal(stickyHeader.contains(scrollArea), false, 'month content must live outside the sticky wrapper');
+});
