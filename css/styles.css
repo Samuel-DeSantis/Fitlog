@@ -16,6 +16,8 @@
   --accent-soft: #EAEFF5;
   --danger: #A8402F;
   --danger-soft: #F5E9E7;
+  --success: #2B6E4F;
+  --success-soft: #E8F3EC;
 
   --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 
@@ -298,6 +300,47 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 
 /* ---------------------------------------------
+   Status pill — clear at-a-glance workout state,
+   next to the date in the view subhead.
+--------------------------------------------- */
+.status-pill {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.status-pill-active {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.status-pill-done {
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+/* Small, muted, tappable — visible enough to know notes exist without
+   competing with the exercise list for attention. */
+.workout-notes-preview {
+  display: block;
+  width: 100%;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--text-muted);
+  margin-top: var(--space-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------
    Workout screen — exercise blocks + set rows
 --------------------------------------------- */
 .exercise-block {
@@ -310,8 +353,9 @@ button:disabled { opacity: 0.5; cursor: default; }
 
 .exercise-block-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
+  gap: var(--space-2);
   margin-bottom: var(--space-2);
 }
 
@@ -321,10 +365,36 @@ button:disabled { opacity: 0.5; cursor: default; }
   letter-spacing: -0.01em;
 }
 
+.exercise-block-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+
+/* Simple, reliable up/down reordering — no drag gestures — matching the
+   same ↑/↓ affordance already used for reordering a Session's exercises. */
+.exercise-reorder-btn {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-faint);
+  border-radius: 8px;
+}
+
+.exercise-reorder-btn:active { background: var(--surface); }
+.exercise-reorder-btn:disabled { opacity: 0.3; }
+
 .exercise-remove {
   font-size: 13px;
   color: var(--text-faint);
   font-weight: 600;
+  padding: 4px 0 4px 8px;
 }
 
 .exercise-previous {
@@ -342,7 +412,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 .set-header-row {
   display: flex;
   gap: var(--space-2);
-  padding: 0 0 6px;
+  padding: 0 6px 6px;
   font-size: 12px;
   font-weight: 700;
   color: var(--text-faint);
@@ -352,8 +422,8 @@ button:disabled { opacity: 0.5; cursor: default; }
 
 .set-header-row .set-index-col { width: 22px; flex: none; }
 .set-header-row .set-input-col { flex: 1; }
-.set-header-row .set-check-col { width: 32px; flex: none; }
-.set-header-row .set-end-col { width: 30px; flex: none; }
+.set-header-row .set-check-col { width: 36px; flex: none; }
+.set-header-row .set-end-col { width: 34px; flex: none; }
 
 .set-rows { display: flex; flex-direction: column; gap: var(--space-2); }
 
@@ -361,6 +431,9 @@ button:disabled { opacity: 0.5; cursor: default; }
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  padding: 6px;
+  border-radius: var(--radius-control);
+  transition: background-color 0.15s ease;
 }
 
 .set-index {
@@ -379,15 +452,43 @@ button:disabled { opacity: 0.5; cursor: default; }
   border: 1.5px solid var(--border-strong);
   border-radius: var(--radius-control);
   padding: 11px var(--space-3);
-  background: var(--surface);
+  background: var(--bg);
 }
 
-.set-row-planned input { border-style: dashed; color: var(--text-muted); }
+/* Completed — an unmistakable, settled state: soft green wash on the
+   whole row (not just the check icon) so a glance down the list shows
+   exactly what's already logged. */
+.set-row:not(.set-row-planned) {
+  background: var(--success-soft);
+}
+
+.set-row:not(.set-row-planned) input {
+  background: var(--bg);
+}
+
+/* Planned/incomplete — dashed, muted. */
+.set-row-planned input { border-style: dashed; color: var(--text-muted); background: var(--surface); }
+
+/* The CURRENT set — the next incomplete one in this exercise, i.e. the
+   one you're actually about to log — gets its own accent treatment so
+   it's obvious at a glance which row to fill in next, distinct from
+   both "already done" and "later, still planned". Declared after
+   .set-row-planned so it wins when both classes are present. */
+.set-row-current {
+  background: var(--accent-soft);
+}
+
+.set-row-current input {
+  border-style: solid;
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--bg);
+}
 
 .set-check {
   flex: none;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -396,12 +497,13 @@ button:disabled { opacity: 0.5; cursor: default; }
   color: var(--text-faint);
   border: 1.5px solid var(--border-strong);
   border-radius: 50%;
+  background: var(--bg);
 }
 
 .set-check-on {
   color: var(--bg);
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--success);
+  border-color: var(--success);
 }
 
 .set-check:disabled {
@@ -410,8 +512,8 @@ button:disabled { opacity: 0.5; cursor: default; }
 
 .set-remove {
   flex: none;
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -424,6 +526,7 @@ button:disabled { opacity: 0.5; cursor: default; }
   font-size: 14px;
   font-weight: 700;
   color: var(--accent);
+  padding: var(--space-2) 0;
 }
 
 #add-exercise-btn { margin-bottom: var(--space-3); }
@@ -686,9 +789,34 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 
 .calendar-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* One full week per row — this is the unit scroll-snap settles on below,
+   so it always has to be a complete, evenly-sized 7-column group (never
+   an individual date cell). */
+.calendar-week-row {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 2px;
+}
+
+/* Gentle (proximity, not mandatory) vertical snap so scrolling settles on
+   a whole week row instead of leaving one cut off — only active while
+   the Calendar route is showing, via the .route-calendar class router.js
+   toggles on <html>. scroll-margin-top keeps the snapped row clear of
+   the sticky Calendar/year + weekday headers above it; the offset itself
+   is measured from the real rendered header and set as a CSS var by
+   calendar.js, with a sane fallback if that hasn't run yet. */
+html.route-calendar {
+  scroll-snap-type: y proximity;
+}
+
+.calendar-week-row {
+  scroll-snap-align: start;
+  scroll-margin-top: var(--calendar-sticky-offset, 96px);
 }
 
 .calendar-day {

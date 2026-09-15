@@ -22,6 +22,12 @@ App.router = (function () {
       tab.classList.toggle('active', tab.dataset.route === path);
     });
 
+    // Scopes the Calendar's gentle scroll-snap (see styles.css) to only
+    // the Calendar route, since it's implemented as document-level
+    // scroll-snap-type and would otherwise apply page scrolling on every
+    // other view too.
+    document.documentElement.classList.toggle('route-calendar', path === '/calendar');
+
     const content = document.getElementById('app-content');
     await handler(content, parts);
     content.scrollTop = 0;

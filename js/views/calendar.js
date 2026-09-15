@@ -61,6 +61,17 @@ App.views = App.views || {};
       btn.addEventListener('click', () => openDayDetail(btn.dataset.date));
     });
 
+    // The scroll-snap rows (see styles.css) need to settle below the
+    // sticky header rather than underneath it. That header's real height
+    // depends on rendered text/font metrics, so it's measured here rather
+    // than hardcoded, and exposed to CSS as a custom property that
+    // .calendar-week-row's scroll-margin-top reads.
+    const stickyHeader = container.querySelector('.calendar-sticky-header');
+    const scrollEl = container.querySelector('#calendar-scroll');
+    if (stickyHeader && scrollEl) {
+      scrollEl.style.setProperty('--calendar-sticky-offset', stickyHeader.offsetHeight + 'px');
+    }
+
     // Land on today with some history visible above and upcoming plans
     // below, rather than at the top of the scroll.
     const todayCell = container.querySelector(`.calendar-day[data-date="${todayStr}"]`);
@@ -73,9 +84,9 @@ App.views = App.views || {};
     const firstWeekday = App.utils.firstWeekdayOfMonth(year, month0);
     const numDays = App.utils.daysInMonth(year, month0);
 
-    let cellsHtml = '';
+    const cells = [];
     for (let i = 0; i < firstWeekday; i++) {
-      cellsHtml += '<div class="calendar-day calendar-day-empty"></div>';
+      cells.push('<div class="calendar-day calendar-day-empty"></div>');
     }
     for (let day = 1; day <= numDays; day++) {
       const dateStr = App.utils.dateAtLocal(year, month0, day);
@@ -90,18 +101,29 @@ App.views = App.views || {};
         dots.push(`<span class="calendar-dot calendar-dot-hollow" style="border-color:${hex}"></span>`);
       });
 
-      cellsHtml += `
+      cells.push(`
         <button class="calendar-day ${dateStr === todayStr ? 'is-today' : ''}" data-date="${dateStr}">
           <span>${day}</span>
           <span class="calendar-dots">${dots.join('')}</span>
         </button>
-      `;
+      `);
+    }
+    // Pad the trailing week with hidden empty cells too, so every week
+    // row — including a month's partial first/last one — is still a
+    // complete, evenly-sized scroll-snap target (see .calendar-week-row).
+    while (cells.length % 7 !== 0) {
+      cells.push('<div class="calendar-day calendar-day-empty"></div>');
+    }
+
+    let weekRowsHtml = '';
+    for (let i = 0; i < cells.length; i += 7) {
+      weekRowsHtml += `<div class="calendar-week-row">${cells.slice(i, i + 7).join('')}</div>`;
     }
 
     return `
       <div class="calendar-month-block" data-month="${year}-${String(month0 + 1).padStart(2, '0')}">
         <div class="calendar-month-heading">${App.utils.formatMonthHeading(year, month0)}</div>
-        <div class="calendar-grid">${cellsHtml}</div>
+        <div class="calendar-grid">${weekRowsHtml}</div>
       </div>
     `;
   }
