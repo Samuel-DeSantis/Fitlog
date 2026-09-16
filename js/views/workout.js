@@ -109,8 +109,21 @@ App.views = App.views || {};
     }
   }
 
+  // Consecutive sets at the same weight only need the reps repeated — the
+  // weight is implied until it actually changes. E.g. 135×8, 135×8, 135×6
+  // becomes "135×8, 8, 6"; a weight change (145×6 after 135s) always
+  // re-states the weight.
+  function formatPreviousPerformance(sets) {
+    let lastWeight = null;
+    return sets.map((s) => {
+      const sameAsLast = lastWeight !== null && s.weight === lastWeight;
+      lastWeight = s.weight;
+      return sameAsLast ? `${s.reps}` : `${s.weight}×${s.reps}`;
+    }).join(', ');
+  }
+
   function exerciseBlockHtml(ex, prevSets, mySets, position, total) {
-    const prevText = prevSets ? prevSets.map(s => `${s.weight}×${s.reps}`).join(', ') : null;
+    const prevText = prevSets && prevSets.length ? formatPreviousPerformance(prevSets) : null;
 
     // The "current" set is the first not-yet-completed one, in order —
     // i.e. the next one the user actually needs to log. Reference-only

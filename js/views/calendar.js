@@ -61,19 +61,13 @@ App.views = App.views || {};
       btn.addEventListener('click', () => openDayDetail(btn.dataset.date));
     });
 
-    // The scroll-snap rows (see styles.css) need to settle below the
-    // sticky header rather than underneath it. That header's real height
-    // depends on rendered text/font metrics, so it's measured here rather
-    // than hardcoded, and exposed to CSS as a custom property that
-    // .calendar-week-row's scroll-margin-top reads.
-    const stickyHeader = container.querySelector('.calendar-sticky-header');
-    const scrollEl = container.querySelector('#calendar-scroll');
-    if (stickyHeader && scrollEl) {
-      scrollEl.style.setProperty('--calendar-sticky-offset', stickyHeader.offsetHeight + 'px');
-    }
-
     // Land on today with some history visible above and upcoming plans
-    // below, rather than at the top of the scroll.
+    // below, rather than at the top of the scroll. This is a programmatic
+    // jump, not a user scroll gesture, and the container's scroll-snap
+    // (see styles.css) is "proximity" rather than "mandatory" specifically
+    // so it never fights a landing like this one that isn't already
+    // aligned to a week row's snap point — proximity only pulls a row
+    // into place once an actual scroll gesture has settled nearby.
     const todayCell = container.querySelector(`.calendar-day[data-date="${todayStr}"]`);
     if (todayCell && typeof todayCell.scrollIntoView === 'function') {
       todayCell.scrollIntoView({ block: 'center' });

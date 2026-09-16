@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { bootRealApp, click, wait } = require('./helpers/domSetup');
 
-test('Calendar scroll-snap: week rows are grouped, snap is scoped to the Calendar route, and header offset is exposed', async () => {
+test('Calendar scroll-snap: week rows are grouped, and the route-scoping class toggles correctly', async () => {
   const { document } = await bootRealApp();
 
   // Not on Calendar yet — the route class must be absent.
@@ -11,6 +11,8 @@ test('Calendar scroll-snap: week rows are grouped, snap is scoped to the Calenda
   document.location.hash = '/calendar';
   await wait(30);
 
+  // Scopes the container-level scroll-snap CSS (see styles.css and the
+  // calendar-scroll-snap-css.test.js source check) to the Calendar route.
   assert.ok(document.documentElement.classList.contains('route-calendar'), 'entering Calendar should scope scroll-snap to this route');
 
   const weekRows = document.querySelectorAll('.calendar-week-row');
@@ -26,10 +28,12 @@ test('Calendar scroll-snap: week rows are grouped, snap is scoped to the Calenda
   assert.equal(directDayChildren.length, 0, 'day cells should be grouped under week rows, not direct children of the grid');
   assert.ok([...grid.children].every(c => c.classList.contains('calendar-week-row')), 'the grid should contain only week rows');
 
-  // The sticky header's real height is exposed to CSS so a snapped row
-  // settles below it rather than underneath it.
+  // #calendar-scroll (the real scrolling container once styles.css is
+  // applied — see calendar-scroll-snap-css.test.js) must exist and
+  // actually contain the week rows.
   const scrollEl = document.getElementById('calendar-scroll');
-  assert.notEqual(scrollEl.style.getPropertyValue('--calendar-sticky-offset'), '', 'the sticky header offset should be exposed as a CSS variable');
+  assert.ok(scrollEl, '#calendar-scroll should exist as the dedicated scroll container');
+  assert.ok(scrollEl.contains(grid), 'the week-row grid should live inside the scroll container');
 
   // Tapping a date and the existing detail-sheet behavior are unaffected
   // by the new row grouping.

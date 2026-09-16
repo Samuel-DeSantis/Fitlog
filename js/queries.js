@@ -67,10 +67,26 @@ App.queries = (function () {
     return entries;
   }
 
+  // "Previous" only means something as a reference if the sets it's
+  // showing were actually done — an incomplete/unconfirmed set (weight
+  // and reps present but never confirmed, e.g. a copied-but-untouched
+  // row left over when a workout was finished anyway) isn't real
+  // performance data. completedAt != null mirrors commands.isSetCompleted
+  // directly rather than depending on commands.js from here, to keep the
+  // db → queries → commands layering one-directional.
+  //
+  // If the most recent matching workout turns out to have no completed
+  // sets at all, it has nothing useful to show — fall back further into
+  // history (still bounded by the same lookback limit) rather than
+  // surfacing an empty/misleading reference.
   async function getPreviousPerformance(exerciseId, excludeWorkoutId) {
     const history = await getExerciseHistory(exerciseId, { limit: 5 });
-    const match = history.find(h => h.workout.id !== excludeWorkoutId);
-    return match ? match.sets : null;
+    for (const entry of history) {
+      if (entry.workout.id === excludeWorkoutId) continue;
+      const completedSets = entry.sets.filter(s => s.completedAt != null);
+      if (completedSets.length) return completedSets;
+    }
+    return null;
   }
 
   async function getExercises(includeArchived) {

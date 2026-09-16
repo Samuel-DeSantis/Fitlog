@@ -748,9 +748,33 @@ button:disabled { opacity: 0.5; cursor: default; }
    Calendar — vertical scroll of stacked months
 --------------------------------------------- */
 
-/* Pinned to the top of the viewport while the month grid scrolls
-   underneath it — an opaque background so scrolled-past dates disappear
-   cleanly behind it rather than showing through. */
+/* While on the Calendar route, #calendar-scroll (below) becomes the
+   ONE real scrolling container — the page itself must not also scroll,
+   or there'd be two competing scroll boxes and scroll-snap would end up
+   attached to the wrong one. Locking overflow on both <html> and <body>
+   is belt-and-suspenders: which of the two the browser treats as
+   "the" document scrolling element isn't fully consistent everywhere. */
+html.route-calendar,
+html.route-calendar body {
+  overflow: hidden;
+}
+
+/* #app-content is shared by every view (normally it just grows with
+   content and lets the page scroll), so this bounded-height, flex-column
+   treatment is scoped to the Calendar route only via the ID selector's
+   specificity — it doesn't touch any other screen. */
+html.route-calendar #app-content {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  padding-bottom: 0;
+}
+
+/* Pinned above the scrolling day grid. Not itself required to scroll
+   anywhere now that it's a sibling of the actual scroll container rather
+   than an overlay on top of page-scrolled content, but position:sticky
+   is left in place as a harmless fallback. */
 .calendar-sticky-header {
   position: sticky;
   top: 0;
@@ -788,6 +812,22 @@ button:disabled { opacity: 0.5; cursor: default; }
   text-transform: uppercase;
 }
 
+/* THE actual Calendar scrolling container — not the document/root.
+   flex:1 + min-height:0 is the standard fix for a flex child that needs
+   to scroll internally instead of stretching its flex-column parent
+   (the same pattern already used for .modal-sheet-search .modal-list
+   above). Scroll-snap lives here, on the real scrolling box, alongside
+   the overflow that makes it one. */
+html.route-calendar #calendar-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  scroll-snap-type: y proximity;
+  padding-bottom: calc(var(--nav-height) + var(--space-6));
+}
+
 .calendar-grid {
   display: flex;
   flex-direction: column;
@@ -796,27 +836,15 @@ button:disabled { opacity: 0.5; cursor: default; }
 
 /* One full week per row — this is the unit scroll-snap settles on below,
    so it always has to be a complete, evenly-sized 7-column group (never
-   an individual date cell). */
+   an individual date cell). Gentle (proximity, not mandatory) snap: it
+   only pulls the row into place once a scroll gesture has already
+   settled nearby, so it never fights active scrolling, tapping a date,
+   or the initial scroll-to-today (see calendar.js) landing mid-row. */
 .calendar-week-row {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 2px;
-}
-
-/* Gentle (proximity, not mandatory) vertical snap so scrolling settles on
-   a whole week row instead of leaving one cut off — only active while
-   the Calendar route is showing, via the .route-calendar class router.js
-   toggles on <html>. scroll-margin-top keeps the snapped row clear of
-   the sticky Calendar/year + weekday headers above it; the offset itself
-   is measured from the real rendered header and set as a CSS var by
-   calendar.js, with a sane fallback if that hasn't run yet. */
-html.route-calendar {
-  scroll-snap-type: y proximity;
-}
-
-.calendar-week-row {
   scroll-snap-align: start;
-  scroll-margin-top: var(--calendar-sticky-offset, 96px);
 }
 
 .calendar-day {
