@@ -102,7 +102,7 @@ test('MIGRATION v2 -> v3: existing exercises get metadata backfilled by name, ID
   global.IDBKeyRange = fakeIndexedDB.IDBKeyRange;
   global.App = {};
   global.window.App = global.App;
-  for (const rel of ['../js/utils.js', '../js/errors.js', '../js/sessionColors.js', '../js/exerciseMetadata.js', '../js/muscleGroups.js', '../js/db.js', '../js/queries.js', '../js/commands.js', '../js/analytics.js']) {
+  for (const rel of ['../js/utils.js', '../js/errors.js', '../js/sessionColors.js', '../js/prescriptions.js', '../js/exerciseMetadata.js', '../js/muscleGroups.js', '../js/db.js', '../js/queries.js', '../js/commands.js', '../js/analytics.js']) {
     delete require.cache[require.resolve(rel)];
     require(rel);
   }

@@ -272,6 +272,73 @@ button:disabled { opacity: 0.5; cursor: default; }
 .list-row-action.danger { color: var(--danger); }
 
 /* ---------------------------------------------
+   Session editor — per-exercise prescription row
+   (Phase 4.2). A dedicated class rather than reusing
+   .list-row directly: this row needs a second line
+   (targetSets/rep range) below the title+actions line,
+   so .list-row-top holds exactly what .list-row used to
+   render, and .list-row-title/.list-row-right/
+   .list-row-action inside it are completely unchanged.
+--------------------------------------------- */
+.session-exercise-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.session-exercise-row:last-child { border-bottom: none; }
+
+.session-exercise-row .list-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.prescription-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.prescription-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.prescription-range { gap: 6px; }
+
+.prescription-input {
+  width: 44px;
+  min-height: 40px;
+  text-align: center;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  padding: 8px 4px;
+  background: var(--bg);
+}
+
+.prescription-input-narrow { width: 38px; }
+
+.prescription-dash {
+  color: var(--text-faint);
+  font-weight: 700;
+}
+
+.prescription-unit {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+/* ---------------------------------------------
    Active workout banner (Today / Train)
 --------------------------------------------- */
 .active-banner {

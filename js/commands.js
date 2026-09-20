@@ -21,6 +21,36 @@ App.commands = (function () {
     };
   }
 
+  // The ONE thing a Session prescription is allowed to influence about a
+  // Workout: how many blank, unconfirmed sets it starts with — one group
+  // per exercise that has a targetSets value, at setOrder 0..targetSets-1.
+  // repMin/repMax never touch a Set at all (they're reference-only, shown
+  // — if at all — the same way previous performance already is), and
+  // weight/reps here are always null, exactly like a set a user adds by
+  // hand: nothing distinguishes a prescribed blank set from a freshly
+  // "+ Add Set"-ed one once it exists, so every existing set-entry
+  // behavior (copy-forward, confirm, edit, remove, the incomplete-set
+  // finish warning, the "current set" highlight) already applies to it
+  // with no changes needed anywhere else.
+  // An exercise with no targetSets — still true for every Session created
+  // before Phase 4.2 added an editor for it — simply gets none, so a
+  // legacy/unprescribed Session starts a Workout exactly as it always
+  // has.
+  function buildPrescribedSets(workoutId, sessionExercises) {
+    const sets = [];
+    (sessionExercises || []).forEach((entry) => {
+      const count = entry.targetSets;
+      if (count == null || count <= 0) return;
+      for (let i = 0; i < count; i++) {
+        sets.push({
+          id: utils.uuid(), workoutId, exerciseId: entry.exerciseId, setOrder: i,
+          weight: null, reps: null, completedAt: null
+        });
+      }
+    });
+    return sets;
+  }
+
   // Unguarded primitive — always creates. Used internally by editing flows
   // and directly by tests that need a workout regardless of active-state.
   // The UI never calls this for "start a workout"; see resolveActiveWorkout.
@@ -40,8 +70,15 @@ App.commands = (function () {
   // corrupted or pre-fix imported data, never from normal use now), this
   // does NOT silently pick one or repair anything — it throws, and the
   // caller is responsible for surfacing that explicitly.
+  //
+  // fields.sessionExercises (optional, normalized {exerciseId, targetSets,
+  // ...} entries) creates that session's prescribed blank sets alongside
+  // the new workout, in the same transaction — but ONLY when a new
+  // workout is actually created here; if an already-active workout is
+  // returned instead (the conflict/resume case just below), nothing about
+  // it is touched.
   async function resolveActiveWorkout(fields) {
-    return db.runTransaction(['workouts'], 'readwrite', async (tx) => {
+    return db.runTransaction(['workouts', 'sets'], 'readwrite', async (tx) => {
       const store = tx.objectStore('workouts');
       const activeRows = await db.reqToPromise(store.index('status').getAll(IDBKeyRange.only('active')));
       if (activeRows.length > 1) {
@@ -50,6 +87,10 @@ App.commands = (function () {
       if (activeRows.length === 1) return activeRows[0];
       const workout = buildWorkoutRecord(fields);
       store.put(workout);
+      if (fields.sessionExercises) {
+        const setsStore = tx.objectStore('sets');
+        buildPrescribedSets(workout.id, fields.sessionExercises).forEach(s => setsStore.put(s));
+      }
       return workout;
     });
   }
@@ -67,8 +108,17 @@ App.commands = (function () {
     return resolveActiveWorkout({ title: last.title, exerciseIds: last.exerciseOrder, sessionId: last.sessionId });
   }
 
+  // Same exercise structure as the Session — order and which exercises,
+  // exactly as before. The prescription now ALSO seeds each exercise's
+  // blank sets (buildPrescribedSets, via resolveActiveWorkout), but
+  // still never touches the Workout's own structure beyond that: no
+  // targetSets/repMin/repMax field ever lands on the workout or exists
+  // on the exerciseOrder, and repMin/repMax never influence a Set at all
+  // — only the count of blank sets to start with does.
   async function startFromSession(session) {
-    return resolveActiveWorkout({ title: session.name, exerciseIds: session.exercises, sessionId: session.id });
+    const sessionExercises = App.prescriptions.normalizeListLenient(session.exercises);
+    const exerciseIds = sessionExercises.map(e => e.exerciseId);
+    return resolveActiveWorkout({ title: session.name, exerciseIds, sessionId: session.id, sessionExercises });
   }
 
   // Every command that modifies an existing workout goes through this: the
@@ -272,9 +322,14 @@ App.commands = (function () {
     return ex;
   }
 
+  // exerciseIds accepts a mix of bare exerciseId strings (what the
+  // Session editor sends today — Phase 4.2 will add prescription editing)
+  // and full/partial {exerciseId, targetSets, repMin, repMax} objects;
+  // App.prescriptions.normalizeList fills in null for anything unset and
+  // throws on an invalid value rather than silently accepting it.
   async function createSession(name, exerciseIds, color) {
     const session = {
-      id: utils.uuid(), name, exercises: [...exerciseIds],
+      id: utils.uuid(), name, exercises: App.prescriptions.normalizeList(exerciseIds),
       color: App.sessionColors.normalize(color),
       createdAt: utils.nowISO(), updatedAt: utils.nowISO()
     };
@@ -282,11 +337,41 @@ App.commands = (function () {
     return session;
   }
 
+  // Note on `exercises`: a bare exerciseId string in the incoming array
+  // preserves that exercise's EXISTING prescription rather than resetting
+  // it to null (App.prescriptions.mergeList) — the current Session editor
+  // (Phase 4.2) always sends full structured objects, so this only
+  // matters for other/legacy callers, but it must never be possible to
+  // silently lose a prescription this way. A structured object always
+  // wins outright for whichever exercise it names, even if that exercise
+  // already had a prescription — see mergeList's own comment for why
+  // that's a different rule than the bare-ID case.
   async function updateSession(id, fields) {
     const session = await db.get('sessions', id);
     if (!session) return null;
+    const existingExercises = session.exercises;
     Object.assign(session, fields);
     if ('color' in fields) session.color = App.sessionColors.normalize(fields.color);
+    if ('exercises' in fields) session.exercises = App.prescriptions.mergeList(existingExercises, fields.exercises);
+    session.updatedAt = utils.nowISO();
+    await db.put('sessions', session);
+    return session;
+  }
+
+  // Sets (or clears, by passing nulls) the prescription for ONE exercise
+  // already in the session, without needing to resupply the whole
+  // exercises array. That exercise's position and every other exercise's
+  // prescription are left untouched. This only ever writes to the
+  // Session — it has no effect on any existing Workout or Set, and never
+  // will: a prescription describes intent, never actual performance.
+  async function updateSessionExercisePrescription(sessionId, exerciseId, fields) {
+    const session = await db.get('sessions', sessionId);
+    if (!session) return null;
+    const exercises = App.prescriptions.normalizeList(session.exercises);
+    const idx = exercises.findIndex(e => e.exerciseId === exerciseId);
+    if (idx === -1) throw new Error('That exercise is not part of this session.');
+    exercises[idx] = App.prescriptions.normalizeEntry({ ...exercises[idx], ...fields, exerciseId });
+    session.exercises = exercises;
     session.updatedAt = utils.nowISO();
     await db.put('sessions', session);
     return session;
@@ -349,7 +434,7 @@ App.commands = (function () {
   // inside ONE transaction so two concurrent start attempts — on the same
   // entry, or on two different entries — can't both succeed.
   async function startPlannedWorkout(calendarEntryId) {
-    return db.runTransaction(['calendarEntries', 'workouts', 'sessions'], 'readwrite', async (tx) => {
+    return db.runTransaction(['calendarEntries', 'workouts', 'sessions', 'sets'], 'readwrite', async (tx) => {
       const entriesStore = tx.objectStore('calendarEntries');
       const workoutsStore = tx.objectStore('workouts');
       const sessionsStore = tx.objectStore('sessions');
@@ -371,15 +456,22 @@ App.commands = (function () {
       }
 
       const rawSession = entry.sessionId ? await db.reqToPromise(sessionsStore.get(entry.sessionId)) : null;
-      const session = rawSession ? { ...rawSession, color: App.sessionColors.normalize(rawSession.color) } : null;
+      const session = rawSession
+        ? { ...rawSession, color: App.sessionColors.normalize(rawSession.color), exercises: App.prescriptions.normalizeListLenient(rawSession.exercises) }
+        : null;
 
       const workout = buildWorkoutRecord({
         title: session ? session.name : 'Workout',
-        exerciseIds: session ? session.exercises : [],
+        exerciseIds: session ? session.exercises.map(e => e.exerciseId) : [],
         sessionId: entry.sessionId,
         date: entry.date
       });
       workoutsStore.put(workout);
+
+      if (session) {
+        const setsStore = tx.objectStore('sets');
+        buildPrescribedSets(workout.id, session.exercises).forEach(s => setsStore.put(s));
+      }
 
       entry.workoutId = workout.id;
       entry.updatedAt = utils.nowISO();
@@ -393,19 +485,31 @@ App.commands = (function () {
   // never touches the active-workout slot, so it can be created even
   // while a different workout is currently active. Reuses the same
   // workout screen for data entry: once created, it opens exactly like
-  // editing any other completed workout.
+  // editing any other completed workout. Also seeds the session's
+  // prescribed blank sets, same as any other session-based start — the
+  // backfilled workout is otherwise a normal (if already-completed)
+  // workout, and blank/unconfirmed sets are exactly as valid to fill in
+  // there as anywhere else.
   async function backfillWorkout(date, sessionId) {
     const session = sessionId ? await App.queries.getSession(sessionId) : null;
-    const workout = buildWorkoutRecord({
-      title: session ? session.name : 'Workout',
-      exerciseIds: session ? session.exercises : [],
-      sessionId: sessionId || null,
-      date
+    return db.runTransaction(['workouts', 'sets'], 'readwrite', async (tx) => {
+      const workout = buildWorkoutRecord({
+        title: session ? session.name : 'Workout',
+        exerciseIds: session ? session.exercises.map(e => e.exerciseId) : [],
+        sessionId: sessionId || null,
+        date
+      });
+      workout.status = 'completed';
+      workout.endedAt = workout.startedAt;
+      tx.objectStore('workouts').put(workout);
+
+      if (session) {
+        const setsStore = tx.objectStore('sets');
+        buildPrescribedSets(workout.id, session.exercises).forEach(s => setsStore.put(s));
+      }
+
+      return workout;
     });
-    workout.status = 'completed';
-    workout.endedAt = workout.startedAt;
-    await db.put('workouts', workout);
-    return workout;
   }
 
   async function setUnit(unit) {
@@ -428,7 +532,7 @@ App.commands = (function () {
     addSet, updateSet, isSetCompleted, setSetCompleted, deleteSet,
     finishWorkout, editWorkoutMeta, deleteWorkout,
     createExercise, archiveExercise,
-    createSession, updateSession, deleteSession,
+    createSession, updateSession, updateSessionExercisePrescription, deleteSession,
     planCalendarEntry, updateCalendarEntry, deleteCalendarEntry, startPlannedWorkout, backfillWorkout,
     setUnit, setBodyweight
   };

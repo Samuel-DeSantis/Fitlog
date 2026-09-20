@@ -120,14 +120,19 @@ App.queries = (function () {
 
   // Every read normalizes color defensively (pre-color-feature sessions,
   // or imported data that lacks it) — callers never see an invalid color.
+  // exercises[] entries get the same treatment for the same reason: a
+  // pre-4.1 session (or a legacy import that predates App.prescriptions
+  // normalizing it at write time) stores bare exerciseId strings, and
+  // every caller downstream should be able to rely on the full
+  // {exerciseId, targetSets, repMin, repMax} shape without checking.
   async function getSessions() {
     const rows = await db.getAll('sessions');
-    return rows.map(s => ({ ...s, color: App.sessionColors.normalize(s.color) }));
+    return rows.map(s => ({ ...s, color: App.sessionColors.normalize(s.color), exercises: App.prescriptions.normalizeListLenient(s.exercises) }));
   }
 
   async function getSession(id) {
     const s = await db.get('sessions', id);
-    return s ? { ...s, color: App.sessionColors.normalize(s.color) } : s;
+    return s ? { ...s, color: App.sessionColors.normalize(s.color), exercises: App.prescriptions.normalizeListLenient(s.exercises) } : s;
   }
 
   async function getCalendarEntry(id) {

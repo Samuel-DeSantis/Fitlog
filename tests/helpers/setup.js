@@ -5,6 +5,7 @@ const SOURCE_FILES = [
   '../../js/utils.js',
   '../../js/errors.js',
   '../../js/sessionColors.js',
+  '../../js/prescriptions.js',
   '../../js/exerciseMetadata.js',
   '../../js/muscleGroups.js',
   '../../js/db.js',

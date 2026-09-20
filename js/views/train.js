@@ -94,7 +94,22 @@ App.views = App.views || {};
     const exercises = await App.queries.getExercises(true);
     const exerciseMap = Object.fromEntries(exercises.map(e => [e.id, e]));
     let name = existingSession ? existingSession.name : '';
-    let orderedIds = existingSession ? [...existingSession.exercises] : [];
+    // existingSession comes from queries.getSessions(), already
+    // normalized to {exerciseId, targetSets, repMin, repMax} entries
+    // (see prescriptions.js) — a pre-4.1 session's entries normalize to
+    // null prescription fields, which render below as simply blank/
+    // placeholder inputs, satisfying "existing Sessions without
+    // prescriptions still render correctly" with no special-casing here.
+    //
+    // sessionExercises is the editor's single source of truth: one array
+    // of self-contained {exerciseId, targetSets, repMin, repMax} objects.
+    // Reordering swaps whole objects, and removing filters by
+    // exerciseId — a prescription can never end up attached to the wrong
+    // exercise via a stale array index, because there is no separate
+    // parallel array to fall out of sync with. Cloned so editing here
+    // never mutates the session object the Train list is still showing
+    // behind this sheet until Save.
+    let sessionExercises = existingSession ? existingSession.exercises.map(e => ({ ...e })) : [];
     let selectedColor = App.sessionColors.normalize(existingSession ? existingSession.color : null);
 
     const overlay = App.utils.el(`
@@ -131,18 +146,45 @@ App.views = App.views || {};
     }
     renderSwatches();
 
+    // Digits only, live as the user types — no decimal point (sets/reps
+    // are always whole numbers), same "sanitize the raw keystrokes"
+    // approach the active-workout set-entry fields use for weight/reps.
+    function sanitizeIntegerInput(raw) {
+      return raw.replace(/[^0-9]/g, '');
+    }
+
     function renderExerciseList() {
       const listEl = overlay.querySelector('#session-exercise-list');
-      listEl.innerHTML = orderedIds.map((id, i) => {
-        const ex = exerciseMap[id];
+      listEl.innerHTML = sessionExercises.map((entry, i) => {
+        const ex = exerciseMap[entry.exerciseId];
         if (!ex) return '';
         return `
-          <div class="list-row" data-id="${id}">
-            <div class="list-row-title">${i + 1}. ${App.utils.escapeHtml(ex.name)}</div>
-            <div class="list-row-right">
-              <button class="list-row-action" data-move-up="${id}" ${i === 0 ? 'disabled' : ''}>↑</button>
-              <button class="list-row-action" data-move-down="${id}" ${i === orderedIds.length - 1 ? 'disabled' : ''}>↓</button>
-              <button class="list-row-action danger" data-remove="${id}">Remove</button>
+          <div class="session-exercise-row" data-id="${entry.exerciseId}">
+            <div class="list-row-top">
+              <div class="list-row-title">${i + 1}. ${App.utils.escapeHtml(ex.name)}</div>
+              <div class="list-row-right">
+                <button class="list-row-action" data-move-up="${entry.exerciseId}" ${i === 0 ? 'disabled' : ''}>↑</button>
+                <button class="list-row-action" data-move-down="${entry.exerciseId}" ${i === sessionExercises.length - 1 ? 'disabled' : ''}>↓</button>
+                <button class="list-row-action danger" data-remove="${entry.exerciseId}">Remove</button>
+              </div>
+            </div>
+            <div class="prescription-row">
+              <label class="prescription-field">
+                <input type="text" inputmode="numeric" enterkeyhint="next" autocomplete="off"
+                  class="prescription-input" data-field="targetSets" placeholder="3"
+                  value="${entry.targetSets != null ? entry.targetSets : ''}" aria-label="Target sets">
+                <span class="prescription-unit">sets</span>
+              </label>
+              <label class="prescription-field prescription-range">
+                <input type="text" inputmode="numeric" enterkeyhint="next" autocomplete="off"
+                  class="prescription-input prescription-input-narrow" data-field="repMin" placeholder="8"
+                  value="${entry.repMin != null ? entry.repMin : ''}" aria-label="Minimum reps">
+                <span class="prescription-dash">–</span>
+                <input type="text" inputmode="numeric" enterkeyhint="done" autocomplete="off"
+                  class="prescription-input prescription-input-narrow" data-field="repMax" placeholder="12"
+                  value="${entry.repMax != null ? entry.repMax : ''}" aria-label="Maximum reps">
+                <span class="prescription-unit">reps</span>
+              </label>
             </div>
           </div>
         `;
@@ -151,21 +193,37 @@ App.views = App.views || {};
       listEl.querySelectorAll('[data-move-up]').forEach((btn) => {
         btn.addEventListener('click', () => {
           const id = btn.dataset.moveUp;
-          const i = orderedIds.indexOf(id);
-          if (i > 0) { [orderedIds[i - 1], orderedIds[i]] = [orderedIds[i], orderedIds[i - 1]]; renderExerciseList(); }
+          const i = sessionExercises.findIndex(e => e.exerciseId === id);
+          if (i > 0) { [sessionExercises[i - 1], sessionExercises[i]] = [sessionExercises[i], sessionExercises[i - 1]]; renderExerciseList(); }
         });
       });
       listEl.querySelectorAll('[data-move-down]').forEach((btn) => {
         btn.addEventListener('click', () => {
           const id = btn.dataset.moveDown;
-          const i = orderedIds.indexOf(id);
-          if (i < orderedIds.length - 1) { [orderedIds[i + 1], orderedIds[i]] = [orderedIds[i], orderedIds[i + 1]]; renderExerciseList(); }
+          const i = sessionExercises.findIndex(e => e.exerciseId === id);
+          if (i < sessionExercises.length - 1) { [sessionExercises[i + 1], sessionExercises[i]] = [sessionExercises[i], sessionExercises[i + 1]]; renderExerciseList(); }
         });
       });
       listEl.querySelectorAll('[data-remove]').forEach((btn) => {
         btn.addEventListener('click', () => {
-          orderedIds = orderedIds.filter(id => id !== btn.dataset.remove);
+          sessionExercises = sessionExercises.filter(e => e.exerciseId !== btn.dataset.remove);
           renderExerciseList();
+        });
+      });
+
+      // Live-bind every keystroke straight into sessionExercises (find by
+      // the row's exerciseId, never by index) so the array is always the
+      // current truth — Save just validates and persists it as-is.
+      listEl.querySelectorAll('.prescription-input').forEach((input) => {
+        input.addEventListener('focus', () => {
+          try { input.select(); } catch (e) { /* selection unsupported here — not fatal */ }
+        });
+        input.addEventListener('input', () => {
+          input.value = sanitizeIntegerInput(input.value);
+          const exerciseId = input.closest('.session-exercise-row').dataset.id;
+          const entry = sessionExercises.find(e => e.exerciseId === exerciseId);
+          if (!entry) return;
+          entry[input.dataset.field] = input.value === '' ? null : parseInt(input.value, 10);
         });
       });
     }
@@ -175,8 +233,13 @@ App.views = App.views || {};
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 
     overlay.querySelector('#session-add-exercise').addEventListener('click', () => {
-      App.ui.openExercisePicker(orderedIds, (ex) => {
-        orderedIds.push(ex.id);
+      App.ui.openExercisePicker(sessionExercises.map(e => e.exerciseId), (ex) => {
+        // Phase 4.1's own default for an unprescribed exercise — null
+        // fields, i.e. no target set yet. Shown as blank inputs with a
+        // placeholder example (see renderExerciseList) rather than a
+        // guessed real value, so nothing is saved unless the person
+        // actually enters it.
+        sessionExercises.push({ exerciseId: ex.id, targetSets: null, repMin: null, repMax: null });
         renderExerciseList();
       });
     });
@@ -184,11 +247,27 @@ App.views = App.views || {};
     overlay.querySelector('#session-save').addEventListener('click', async () => {
       const nameValue = overlay.querySelector('#session-name').value.trim();
       if (!nameValue) { alert('Give the session a name.'); return; }
-      if (!orderedIds.length) { alert('Add at least one exercise.'); return; }
+      if (!sessionExercises.length) { alert('Add at least one exercise.'); return; }
+
+      // Reuse Phase 4.1's own validation (App.prescriptions.validate) as
+      // the single source of truth for what's valid, rather than
+      // re-implementing the rules here — this loop only adds pointing at
+      // which exercise is the problem, since that command-layer error
+      // message alone doesn't say which of several exercises it's about.
+      for (const entry of sessionExercises) {
+        try {
+          App.prescriptions.validate(entry);
+        } catch (err) {
+          const ex = exerciseMap[entry.exerciseId];
+          alert(`${ex ? ex.name : 'This exercise'}: ${err.message}`);
+          return;
+        }
+      }
+
       if (existingSession) {
-        await App.commands.updateSession(existingSession.id, { name: nameValue, exercises: orderedIds, color: selectedColor });
+        await App.commands.updateSession(existingSession.id, { name: nameValue, exercises: sessionExercises, color: selectedColor });
       } else {
-        await App.commands.createSession(nameValue, orderedIds, selectedColor);
+        await App.commands.createSession(nameValue, sessionExercises, selectedColor);
       }
       overlay.remove();
       App.router.render();

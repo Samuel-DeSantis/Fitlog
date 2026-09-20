@@ -2,7 +2,7 @@ window.App = window.App || {};
 
 App.db = (function () {
   const DB_NAME = 'fitlog_v2';
-  const DB_VERSION = 3;
+  const DB_VERSION = 4;
   const FORMAT_VERSION = 1;
   const STORES = ['exercises', 'sessions', 'workouts', 'sets', 'calendarEntries', 'settings'];
 
@@ -87,6 +87,31 @@ App.db = (function () {
               ex.movementType = meta ? meta.movementType : '';
               cursor.update(ex);
             }
+            cursor.continue();
+          };
+        }
+
+        // v3 -> v4 (Phase 4.1): Session exercises gained an optional
+        // training prescription (targetSets/repMin/repMax) alongside the
+        // exerciseId they always had. Existing sessions predate this and
+        // store plain exerciseId strings — normalize every entry into the
+        // full {exerciseId, targetSets, repMin, repMax} shape (unset
+        // fields become null, meaning "no prescription yet"), so every
+        // consumer can rely on one consistent shape regardless of which
+        // version a session was created under. Session id, name, color,
+        // exercise order, and every exerciseId are preserved exactly —
+        // only the shape of each exercises[] entry changes. This touches
+        // only the sessions store: Workouts, Sets, and Calendar Entries
+        // (and the actual historical performance they hold) are
+        // completely untouched by this migration.
+        if (oldVersion > 0 && oldVersion < 4) {
+          const sessionsStore = tx.objectStore('sessions');
+          sessionsStore.openCursor().onsuccess = (ev) => {
+            const cursor = ev.target.result;
+            if (!cursor) return;
+            const session = cursor.value;
+            session.exercises = App.prescriptions.normalizeList(session.exercises || []);
+            cursor.update(session);
             cursor.continue();
           };
         }
@@ -259,6 +284,48 @@ App.db = (function () {
     return { ...item, ...seedMetadataByName(item.name) };
   }
 
+  // Imported session records may predate the prescription fields
+  // entirely — a pre-4.1 backup stores exercises as bare exerciseId
+  // strings, same legacy shape the v3->v4 IndexedDB migration handles
+  // (which only runs on schema upgrade, never on import). Normalize
+  // every entry to the current shape:
+  //  - already fully-shaped entries -> pass through App.prescriptions'
+  //    (lenient) normalization, which also catches a corrupted/hand-
+  //    edited value without failing the whole import.
+  //  - legacy (bare-string) entries, merged into an existing session
+  //    that already has real prescriptions -> keep each exercise's
+  //    existing prescription for any exerciseId still present; a legacy
+  //    import must never blank out prescriptions already set locally.
+  //  - legacy entries otherwise -> normalize to "no prescription yet",
+  //    same as any newly-added exercise.
+  // Session id, name, color, and exercise order always come from the
+  // imported file either way.
+  function isLegacySessionExercisesShape(exercisesList) {
+    return (exercisesList || []).some(e => typeof e === 'string');
+  }
+
+  async function normalizeImportedSession(objectStore, item, mode) {
+    const rawExercises = item.exercises || [];
+    if (!isLegacySessionExercisesShape(rawExercises)) {
+      return { ...item, exercises: App.prescriptions.normalizeListLenient(rawExercises) };
+    }
+
+    if (mode === 'merge') {
+      const existing = await reqToPromise(objectStore.get(item.id));
+      if (existing && !isLegacySessionExercisesShape(existing.exercises || [])) {
+        const existingByExerciseId = Object.fromEntries(
+          App.prescriptions.normalizeListLenient(existing.exercises).map(e => [e.exerciseId, e])
+        );
+        return {
+          ...item,
+          exercises: rawExercises.map(id => existingByExerciseId[id] || App.prescriptions.normalizeEntryLenient(id))
+        };
+      }
+    }
+
+    return { ...item, exercises: App.prescriptions.normalizeListLenient(rawExercises) };
+  }
+
   async function importAll(data, mode) {
     mode = mode || 'merge';
     const { valid, errors } = validateImportPayload(data);
@@ -279,6 +346,11 @@ App.db = (function () {
         if (s === 'exercises') {
           for (const item of records) {
             const normalized = await normalizeImportedExercise(os, item, mode);
+            os.put(normalized);
+          }
+        } else if (s === 'sessions') {
+          for (const item of records) {
+            const normalized = await normalizeImportedSession(os, item, mode);
             os.put(normalized);
           }
         } else {

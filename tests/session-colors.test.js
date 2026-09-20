@@ -81,7 +81,7 @@ test('a pre-existing session without a color is backfilled with a default during
   global.IDBKeyRange = fakeIndexedDB.IDBKeyRange;
   global.App = {};
   global.window.App = global.App;
-  for (const rel of ['../js/utils.js', '../js/errors.js', '../js/sessionColors.js', '../js/db.js', '../js/queries.js', '../js/commands.js', '../js/analytics.js']) {
+  for (const rel of ['../js/utils.js', '../js/errors.js', '../js/sessionColors.js', '../js/prescriptions.js', '../js/db.js', '../js/queries.js', '../js/commands.js', '../js/analytics.js']) {
     delete require.cache[require.resolve(rel)];
     require(rel);
   }
