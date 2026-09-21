@@ -300,21 +300,23 @@ button:disabled { opacity: 0.5; cursor: default; }
 
 .prescription-row {
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .prescription-field {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  flex-shrink: 0;
+  gap: 6px;
 }
 
 .prescription-range { gap: 6px; }
 
 .prescription-input {
-  width: 44px;
+  width: 40px;
+  flex-shrink: 0;
   min-height: 40px;
   text-align: center;
   font-size: 16px;
@@ -325,17 +327,32 @@ button:disabled { opacity: 0.5; cursor: default; }
   background: var(--bg);
 }
 
-.prescription-input-narrow { width: 38px; }
+.prescription-input-narrow { width: 34px; }
 
 .prescription-dash {
   color: var(--text-faint);
   font-weight: 700;
+  flex-shrink: 0;
 }
 
 .prescription-unit {
   font-size: 13px;
   color: var(--text-muted);
   font-weight: 600;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* Below this, a handful of very narrow phones (~340px CSS width and
+   under) start to feel tight once the exercise name and Remove/reorder
+   buttons above are accounted for — tighten spacing and the inputs
+   slightly rather than letting Sets/Reps wrap onto separate lines. */
+@media (max-width: 340px) {
+  .prescription-row { gap: var(--space-2); }
+  .prescription-field { gap: 4px; }
+  .prescription-input { width: 34px; }
+  .prescription-input-narrow { width: 30px; }
+  .prescription-unit { font-size: 12px; }
 }
 
 /* ---------------------------------------------

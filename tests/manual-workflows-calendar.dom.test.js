@@ -199,7 +199,7 @@ test('Calendar QA: header shows the current year, day-detail heading uses compac
   assert.match(dayHeading, /^[A-Za-z]{3} · [A-Za-z]{3} \d{1,2}$/);
 });
 
-test('Calendar QA: header and weekday row are wrapped in the sticky container', async () => {
+test('Calendar QA: the header is sticky, but each month has its own (non-sticky) weekday row', async () => {
   const { document } = await bootRealApp();
   document.location.hash = '/calendar';
   await wait(30);
@@ -207,11 +207,29 @@ test('Calendar QA: header and weekday row are wrapped in the sticky container', 
   const stickyHeader = document.querySelector('.calendar-sticky-header');
   assert.ok(stickyHeader, 'a sticky header wrapper should exist');
   assert.ok(stickyHeader.querySelector('.view-header h1'), 'the page heading should be inside the sticky wrapper');
-  assert.ok(stickyHeader.querySelector('.calendar-weekdays'), 'the weekday labels should be inside the sticky wrapper');
+  assert.equal(stickyHeader.querySelector('.calendar-weekdays'), null, 'the weekday row is no longer global/sticky — it now belongs to each month');
 
   // The scrolling month content must be a SIBLING of the sticky header,
   // not nested inside it, or it would scroll away together with it.
   const scrollArea = document.getElementById('calendar-scroll');
   assert.ok(scrollArea, 'the scrolling months container should exist');
   assert.equal(stickyHeader.contains(scrollArea), false, 'month content must live outside the sticky wrapper');
+
+  // Every month block gets its own weekday row, directly under its own
+  // month heading, and it scrolls with that month rather than staying
+  // pinned to the top.
+  const monthBlocks = document.querySelectorAll('.calendar-month-block');
+  assert.ok(monthBlocks.length > 1, 'the fixture window should span more than one month');
+  monthBlocks.forEach((block) => {
+    const heading = block.querySelector('.calendar-month-heading');
+    const weekdays = block.querySelector('.calendar-weekdays');
+    assert.ok(weekdays, 'each month block should have its own weekday row');
+    assert.equal(stickyHeader.contains(weekdays), false, 'a month\'s weekday row must not live in the sticky header');
+    assert.equal(weekdays.querySelectorAll('span').length, 7, 'Sun through Sat');
+    assert.equal(weekdays.textContent.trim().slice(0, 3), 'Sun', 'starts the week on Sunday');
+    // Directly under that month's own heading — immediately after it,
+    // before the day grid.
+    assert.equal(heading.nextElementSibling, weekdays, "the weekday row sits directly under this month's own heading");
+    assert.equal(weekdays.nextElementSibling.classList.contains('calendar-grid'), true, "the day grid follows this month's weekday row");
+  });
 });

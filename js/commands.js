@@ -77,6 +77,17 @@ App.commands = (function () {
   // workout is actually created here; if an already-active workout is
   // returned instead (the conflict/resume case just below), nothing about
   // it is touched.
+  //
+  // fields.requireRelated (optional): by default, an already-active
+  // workout is simply returned/resumed regardless of what it is — correct
+  // for a free-form start, which has no particular workout to be related
+  // or unrelated to. When true, that active workout is only treated as a
+  // resume if its sessionId matches fields.sessionId; anything else
+  // throws ActiveWorkoutConflictError instead, matching
+  // startPlannedWorkout's own conflict behavior. Used by startFromSession
+  // so starting a specific Session can never silently hand back an
+  // unrelated active workout (e.g. Legs, while the person just tapped
+  // Start on Upper Strength).
   async function resolveActiveWorkout(fields) {
     return db.runTransaction(['workouts', 'sets'], 'readwrite', async (tx) => {
       const store = tx.objectStore('workouts');
@@ -84,7 +95,12 @@ App.commands = (function () {
       if (activeRows.length > 1) {
         throw new App.errors.MultipleActiveWorkoutsError(activeRows);
       }
-      if (activeRows.length === 1) return activeRows[0];
+      if (activeRows.length === 1) {
+        if (fields.requireRelated && activeRows[0].sessionId !== fields.sessionId) {
+          throw new App.errors.ActiveWorkoutConflictError(activeRows[0]);
+        }
+        return activeRows[0];
+      }
       const workout = buildWorkoutRecord(fields);
       store.put(workout);
       if (fields.sessionExercises) {
@@ -115,10 +131,21 @@ App.commands = (function () {
   // targetSets/repMin/repMax field ever lands on the workout or exists
   // on the exerciseOrder, and repMin/repMax never influence a Set at all
   // — only the count of blank sets to start with does.
+  //
+  // requireRelated: true — starting a SPECIFIC Session must not silently
+  // resume an unrelated active workout (see resolveActiveWorkout); if one
+  // is active, this throws ActiveWorkoutConflictError instead, unless
+  // that active workout IS already this same session, in which case it's
+  // a resume (equivalent in spirit to startPlannedWorkout resuming via
+  // its entry.workoutId link — a Session-based start has no calendar
+  // entry to link through, so sessionId is the relatedness check here).
   async function startFromSession(session) {
     const sessionExercises = App.prescriptions.normalizeListLenient(session.exercises);
     const exerciseIds = sessionExercises.map(e => e.exerciseId);
-    return resolveActiveWorkout({ title: session.name, exerciseIds, sessionId: session.id, sessionExercises });
+    return resolveActiveWorkout({
+      title: session.name, exerciseIds, sessionId: session.id, sessionExercises,
+      requireRelated: true
+    });
   }
 
   // Every command that modifies an existing workout goes through this: the
@@ -408,17 +435,6 @@ App.commands = (function () {
     await db.remove('calendarEntries', id);
   }
 
-  // Starts (or resumes) the Workout for a planned Calendar Entry, without
-  // ever creating a second one for the same entry:
-  //  - If the entry is already linked to a workout that still exists,
-  //    that link is authoritative — just return it (covers "tapped Start,
-  //    navigated away, came back and tapped Start again").
-  //  - Otherwise resolve/create via the same guarded path every other
-  //    "start a workout" action uses, then record the link.
-  // The new workout is dated to match the entry's planned date (not
-  // "today"), so the calendar dot for that date simply flips from hollow
-  // to filled in place, matching what the user planned regardless of the
-  // exact moment they actually pressed Start.
   // Starts (or resumes) the Workout for a planned Calendar Entry:
   //  - If the entry is already linked to a workout that still exists,
   //    that link is authoritative — just return it (covers "tapped Start,
@@ -429,7 +445,9 @@ App.commands = (function () {
   //    the plan to it, and let the caller tell the user to finish/resume
   //    it first.
   //  - Only when neither of the above applies does this create a new
-  //    workout and link it.
+  //    workout (dated to the entry's planned date, not "today", so the
+  //    calendar dot for that date simply flips from hollow to filled in
+  //    place) and link it.
   // The whole check-then-act sequence (including the session lookup) runs
   // inside ONE transaction so two concurrent start attempts — on the same
   // entry, or on two different entries — can't both succeed.

@@ -8,6 +8,7 @@ App.views = App.views || {};
   // pagination machinery.
   const MONTHS_BACK = 6;
   const MONTHS_FORWARD = 3;
+  const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   App.views.calendar = async function (container) {
     const now = new Date();
@@ -43,7 +44,6 @@ App.views = App.views || {};
     });
 
     const todayStr = App.utils.todayLocalISO();
-    const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
     const monthBlocksHtml = months
       .map(({ year, month }) => renderMonthBlock(year, month, completedByDate, plannedByDate, sessionMap, todayStr))
@@ -52,7 +52,6 @@ App.views = App.views || {};
     container.innerHTML = `
       <div class="calendar-sticky-header">
         <div class="view-header"><h1>Calendar · ${currentYear}</h1></div>
-        <div class="calendar-weekdays">${weekdayLabels.map(d => `<span>${d}</span>`).join('')}</div>
       </div>
       <div class="calendar-scroll" id="calendar-scroll">${monthBlocksHtml}</div>
     `;
@@ -117,6 +116,7 @@ App.views = App.views || {};
     return `
       <div class="calendar-month-block" data-month="${year}-${String(month0 + 1).padStart(2, '0')}">
         <div class="calendar-month-heading">${App.utils.formatMonthHeading(year, month0)}</div>
+        <div class="calendar-weekdays">${WEEKDAY_LABELS.map(d => `<span>${d}</span>`).join('')}</div>
         <div class="calendar-grid">${weekRowsHtml}</div>
       </div>
     `;

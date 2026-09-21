@@ -11,7 +11,14 @@ test('startWorkout is idempotent: a second call resumes, never duplicates', asyn
   assert.equal(active.length, 1);
 });
 
-test('repeatLastWorkout and startFromSession also resume rather than duplicate an active workout', async () => {
+// startFromSession's own resume-vs-conflict behavior (Phase 4.3
+// correction: it must not silently resume an unrelated active workout
+// the way the generic paths below do) is covered in
+// session-start-conflict.test.js, since it needs a real Session (with a
+// real id) to test meaningfully — unlike startWorkout/repeatLastWorkout,
+// which have no notion of "session" to be related or unrelated to and
+// so keep resuming whatever is active, exactly as before.
+test('startWorkout and repeatLastWorkout resume rather than duplicate an active (session-less) workout', async () => {
   const App = freshApp();
   const bench = await App.commands.createExercise('Bench Press');
   const w1 = await App.commands.createWorkout({ title: 'Day 1', exerciseIds: [bench.id] });
@@ -19,10 +26,8 @@ test('repeatLastWorkout and startFromSession also resume rather than duplicate a
 
   const active = await App.commands.startWorkout('Workout', [bench.id]);
   const viaRepeat = await App.commands.repeatLastWorkout();
-  const viaSession = await App.commands.startFromSession({ name: 'X', exercises: [bench.id] });
 
   assert.equal(viaRepeat.id, active.id);
-  assert.equal(viaSession.id, active.id);
   const activeRows = (await App.db.getAll('workouts')).filter(w => w.status === 'active');
   assert.equal(activeRows.length, 1);
 });

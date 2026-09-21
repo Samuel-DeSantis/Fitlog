@@ -170,12 +170,13 @@ App.views = App.views || {};
             </div>
             <div class="prescription-row">
               <label class="prescription-field">
+                <span class="prescription-unit">Sets</span>
                 <input type="text" inputmode="numeric" enterkeyhint="next" autocomplete="off"
                   class="prescription-input" data-field="targetSets" placeholder="3"
                   value="${entry.targetSets != null ? entry.targetSets : ''}" aria-label="Target sets">
-                <span class="prescription-unit">sets</span>
               </label>
               <label class="prescription-field prescription-range">
+                <span class="prescription-unit">Reps</span>
                 <input type="text" inputmode="numeric" enterkeyhint="next" autocomplete="off"
                   class="prescription-input prescription-input-narrow" data-field="repMin" placeholder="8"
                   value="${entry.repMin != null ? entry.repMin : ''}" aria-label="Minimum reps">
@@ -183,7 +184,6 @@ App.views = App.views || {};
                 <input type="text" inputmode="numeric" enterkeyhint="done" autocomplete="off"
                   class="prescription-input prescription-input-narrow" data-field="repMax" placeholder="12"
                   value="${entry.repMax != null ? entry.repMax : ''}" aria-label="Maximum reps">
-                <span class="prescription-unit">reps</span>
               </label>
             </div>
           </div>
