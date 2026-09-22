@@ -1013,17 +1013,145 @@ html.route-calendar #calendar-scroll {
 .day-occurrence-actions button.danger { color: var(--danger); }
 
 /* ---------------------------------------------
-   Placeholder screens (Progress in Phase 1)
+   Progress (Phase 5) — exercise selector, a compact
+   3-stat summary, two simple SVG trend charts, and a
+   chronological history list. Hairline dividers rather
+   than boxed cards, consistent with the rest of the app.
 --------------------------------------------- */
-.placeholder-block {
-  padding: var(--space-6) 0;
+.progress-selector {
+  margin-bottom: var(--space-5);
+}
+
+.progress-selector-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: var(--space-2);
+}
+
+.progress-select-wrap {
+  position: relative;
+}
+
+.progress-select {
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  font-size: 17px;
+  font-weight: 700;
+  padding: 12px 36px 12px var(--space-3);
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.progress-select-arrow {
+  position: absolute;
+  right: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-faint);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.progress-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.progress-stat {
   text-align: center;
+  padding: var(--space-2) var(--space-1);
+}
+
+.progress-stat + .progress-stat {
+  border-left: 1px solid var(--border);
+}
+
+.progress-stat-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-stat-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.progress-chart-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.progress-chart-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.progress-chart-dot { fill: var(--accent); }
+
+.progress-chart-point-label {
+  font-size: 13px;
+  font-weight: 700;
+  fill: var(--text);
+}
+
+.progress-chart-caption {
+  font-size: 12px;
+  color: var(--text-faint);
+  text-align: center;
+  margin: var(--space-2) 0 0;
+}
+
+.progress-chart-empty {
+  font-size: 14px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: var(--space-5) 0;
+}
+
+.progress-history-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.progress-history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.progress-history-row:last-child { border-bottom: none; }
+
+.progress-history-date {
+  flex: none;
+  font-size: 14px;
+  font-weight: 700;
   color: var(--text-muted);
 }
 
-.placeholder-block strong {
-  display: block;
+.progress-history-sets {
+  font-size: 15px;
+  font-weight: 600;
   color: var(--text);
-  font-size: 18px;
-  margin-bottom: var(--space-2);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }

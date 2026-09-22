@@ -12,6 +12,7 @@ const SOURCE_FILES = [
   '../../js/queries.js',
   '../../js/commands.js',
   '../../js/analytics.js',
+  '../../js/progress.js',
   '../../js/seed.js'
 ];
 
