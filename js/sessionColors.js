@@ -5,17 +5,19 @@ window.App = window.App || {};
 // colors). Used for the small Calendar dot indicators; the calendar
 // itself stays mostly monochrome.
 App.sessionColors = (function () {
+  // Muted tones for small calendar/list indicators on a dark UI —
+  // secondary only; the app's primary accent remains cyan.
   const PALETTE = [
-    { key: 'red', label: 'Red', hex: '#C4483C' },
-    { key: 'orange', label: 'Orange', hex: '#C97A3B' },
-    { key: 'yellow', label: 'Yellow', hex: '#B99A2E' },
-    { key: 'green', label: 'Green', hex: '#4C8B5D' },
-    { key: 'teal', label: 'Teal', hex: '#3B8F8A' },
-    { key: 'blue', label: 'Blue', hex: '#3D6EA5' },
-    { key: 'indigo', label: 'Indigo', hex: '#5B5FA8' },
-    { key: 'purple', label: 'Purple', hex: '#8B5FA8' },
-    { key: 'pink', label: 'Pink', hex: '#B8567B' },
-    { key: 'gray', label: 'Gray', hex: '#7A7F87' }
+    { key: 'red', label: 'Red', hex: '#B85A52' },
+    { key: 'orange', label: 'Orange', hex: '#B8824A' },
+    { key: 'yellow', label: 'Yellow', hex: '#A8943A' },
+    { key: 'green', label: 'Green', hex: '#5A9A6A' },
+    { key: 'teal', label: 'Teal', hex: '#4A9A94' },
+    { key: 'blue', label: 'Blue', hex: '#5A7FB0' },
+    { key: 'indigo', label: 'Indigo', hex: '#6B6FB0' },
+    { key: 'purple', label: 'Purple', hex: '#8A6FB0' },
+    { key: 'pink', label: 'Pink', hex: '#A86A85' },
+    { key: 'gray', label: 'Gray', hex: '#7A8490' }
   ];
   const DEFAULT_COLOR = 'gray';
   const BY_KEY = Object.fromEntries(PALETTE.map(c => [c.key, c]));

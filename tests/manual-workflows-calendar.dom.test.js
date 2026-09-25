@@ -63,7 +63,7 @@ test('Calendar QA: plan a future Session, see a hollow colored dot, start it, fi
   assert.ok(cell, 'the planned date should be visible in the current month view');
   const hollowDot = cell.querySelector('.calendar-dot.calendar-dot-hollow');
   assert.ok(hollowDot, 'a hollow dot should mark the planned occurrence');
-  assert.match(hollowDot.getAttribute('style'), /#C4483C/i, "the dot should use the session's red color");
+  assert.match(hollowDot.getAttribute('style'), /#B85A52/i, "the dot should use the session's red color");
 
   click(cell);
   await wait(60);

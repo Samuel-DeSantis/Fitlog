@@ -1,23 +1,28 @@
 /* ---------------------------------------------
-   Tokens — clean, typography-first, content over
-   chrome. Near-white surface, one restrained
-   accent, hairline dividers instead of boxed
-   cards, pill controls.
+   Tokens — dark-mode-first technical training
+   journal. Charcoal/navy surfaces, restrained
+   cyan accent, hairline dividers, pill controls.
 --------------------------------------------- */
 :root {
-  --bg: #FFFFFF;
-  --surface: #FBFBFC;
-  --border: #E6E8EB;
-  --border-strong: #D3D7DC;
-  --text: #15181C;
-  --text-muted: #6E7681;
-  --text-faint: #9AA1AC;
-  --accent: #1F3A5F;
-  --accent-soft: #EAEFF5;
-  --danger: #A8402F;
-  --danger-soft: #F5E9E7;
-  --success: #2B6E4F;
-  --success-soft: #E8F3EC;
+  --bg: #0B0F14;
+  --surface: #111820;
+  --surface-raised: #151E27;
+
+  --text: #E8EEF5;
+  --text-muted: #A7B4C2;
+  --text-faint: #718092;
+
+  --accent: #38BDF8;
+  --accent-bright: #67D5FF;
+  --accent-soft: rgba(56, 189, 248, 0.14);
+
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.13);
+
+  --danger: #F87171;
+  --danger-soft: rgba(248, 113, 113, 0.14);
+  --success: #34D399;
+  --success-soft: rgba(52, 211, 153, 0.14);
 
   --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 
@@ -50,6 +55,12 @@ body { min-height: 100vh; min-height: 100dvh; }
 button, input, textarea {
   font-family: inherit;
   color: inherit;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-faint);
+  opacity: 1;
 }
 
 button {
@@ -141,8 +152,8 @@ button:disabled { opacity: 0.5; cursor: default; }
   left: 0;
   right: 0;
   height: var(--nav-height);
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: saturate(180%) blur(12px);
+  background: rgba(11, 15, 20, 0.94);
+  backdrop-filter: saturate(140%) blur(12px);
   border-top: 1px solid var(--border);
   display: flex;
   align-items: stretch;
@@ -170,7 +181,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 
 .nav-tab.active {
-  color: var(--text);
+  color: var(--accent);
 }
 
 .nav-tab.active svg {
@@ -183,8 +194,8 @@ button:disabled { opacity: 0.5; cursor: default; }
 .btn-primary {
   display: block;
   width: 100%;
-  background: var(--text);
-  color: var(--bg);
+  background: var(--accent);
+  color: #0B0F14;
   font-size: 16px;
   font-weight: 700;
   padding: 15px var(--space-5);
@@ -197,7 +208,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 .btn-secondary {
   display: block;
   width: 100%;
-  background: var(--bg);
+  background: var(--surface);
   border: 1.5px solid var(--border-strong);
   color: var(--text);
   font-size: 16px;
@@ -211,7 +222,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 .btn-danger {
   display: block;
   width: 100%;
-  background: var(--bg);
+  background: var(--surface);
   border: 1.5px solid var(--danger);
   color: var(--danger);
   font-size: 15px;
@@ -324,7 +335,8 @@ button:disabled { opacity: 0.5; cursor: default; }
   border: 1.5px solid var(--border-strong);
   border-radius: var(--radius-control);
   padding: 8px 4px;
-  background: var(--bg);
+  background: var(--surface);
+  color: var(--text);
 }
 
 .prescription-input-narrow { width: 34px; }
@@ -536,7 +548,8 @@ button:disabled { opacity: 0.5; cursor: default; }
   border: 1.5px solid var(--border-strong);
   border-radius: var(--radius-control);
   padding: 11px var(--space-3);
-  background: var(--bg);
+  background: var(--surface);
+  color: var(--text);
 }
 
 /* Completed — an unmistakable, settled state: soft green wash on the
@@ -547,7 +560,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 
 .set-row:not(.set-row-planned) input {
-  background: var(--bg);
+  background: var(--surface);
 }
 
 /* Planned/incomplete — dashed, muted. */
@@ -566,7 +579,7 @@ button:disabled { opacity: 0.5; cursor: default; }
   border-style: solid;
   border-color: var(--accent);
   color: var(--text);
-  background: var(--bg);
+  background: var(--surface);
 }
 
 .set-check {
@@ -581,11 +594,11 @@ button:disabled { opacity: 0.5; cursor: default; }
   color: var(--text-faint);
   border: 1.5px solid var(--border-strong);
   border-radius: 50%;
-  background: var(--bg);
+  background: var(--surface);
 }
 
 .set-check-on {
-  color: var(--bg);
+  color: #0B0F14;
   background: var(--success);
   border-color: var(--success);
 }
@@ -622,18 +635,19 @@ button:disabled { opacity: 0.5; cursor: default; }
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(21, 24, 28, 0.4);
+  background: rgba(0, 0, 0, 0.55);
   display: flex;
   align-items: flex-end;
   z-index: 20;
 }
 
 .modal-sheet {
-  background: var(--bg);
+  background: var(--surface-raised);
   width: 100%;
   max-height: 82vh;
   overflow-y: auto;
   border-radius: 20px 20px 0 0;
+  border-top: 1px solid var(--border);
   padding: var(--space-4) var(--space-4) calc(var(--space-6) + env(safe-area-inset-bottom));
 }
 
@@ -726,9 +740,9 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 
 .muscle-chip-active {
-  background: var(--text);
-  color: var(--bg);
-  border-color: var(--text);
+  background: var(--accent);
+  color: #0B0F14;
+  border-color: var(--accent);
 }
 
 .modal-list-section-label {
@@ -785,8 +799,8 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 
 .segmented-btn.active {
-  background: var(--text);
-  color: var(--bg);
+  background: var(--accent);
+  color: #0B0F14;
 }
 
 /* ---------------------------------------------
@@ -808,7 +822,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 
 .color-swatch-selected {
-  border-color: var(--text);
+  border-color: var(--accent-bright);
 }
 
 .color-dot {
@@ -1043,7 +1057,7 @@ html.route-calendar #calendar-scroll {
   padding: 12px 36px 12px var(--space-3);
   border: 1.5px solid var(--border-strong);
   border-radius: var(--radius-control);
-  background: var(--bg);
+  background: var(--surface);
   color: var(--text);
 }
 
