@@ -26,7 +26,60 @@ App.exerciseSeedData = [
   { name: 'Barbell Curl', primaryMuscles: ['biceps'], secondaryMuscles: [], equipment: 'barbell', movementType: 'isolation' },
   { name: 'Dumbbell Curl', primaryMuscles: ['biceps'], secondaryMuscles: [], equipment: 'dumbbell', movementType: 'isolation' },
   { name: 'Tricep Pushdown', primaryMuscles: ['triceps'], secondaryMuscles: [], equipment: 'cable', movementType: 'isolation' },
-  { name: 'Plank', primaryMuscles: ['abs'], secondaryMuscles: [], equipment: 'bodyweight', movementType: 'core' }
+  { name: 'Plank', primaryMuscles: ['abs'], secondaryMuscles: [], equipment: 'bodyweight', movementType: 'core' },
+
+  // --- Library expansion below. Anything already covered above by an
+  // equivalent lift (e.g. Barbell Bench Press ~= Bench Press, Push-Up
+  // ~= Push-up) is intentionally left out to avoid near-duplicate
+  // entries in the picker. ---
+
+  // Chest
+  { name: 'Incline Dumbbell Bench Press', primaryMuscles: ['chest'], secondaryMuscles: ['shoulders', 'triceps'], equipment: 'dumbbell', movementType: 'horizontal_push' },
+  { name: 'Dumbbell Fly', primaryMuscles: ['chest'], secondaryMuscles: ['shoulders'], equipment: 'dumbbell', movementType: 'isolation' },
+  { name: 'Cable Fly', primaryMuscles: ['chest'], secondaryMuscles: ['shoulders'], equipment: 'cable', movementType: 'isolation' },
+  { name: 'Dip', primaryMuscles: ['chest'], secondaryMuscles: ['triceps', 'shoulders'], equipment: 'bodyweight', movementType: 'horizontal_push' },
+
+  // Back
+  { name: 'Dumbbell Row', primaryMuscles: ['back'], secondaryMuscles: ['biceps'], equipment: 'dumbbell', movementType: 'horizontal_pull' },
+  { name: 'Chest-Supported Row', primaryMuscles: ['back'], secondaryMuscles: ['biceps'], equipment: 'machine', movementType: 'horizontal_pull' },
+  { name: 'Seated Cable Row', primaryMuscles: ['back'], secondaryMuscles: ['biceps'], equipment: 'cable', movementType: 'horizontal_pull' },
+  { name: 'Straight-Arm Pulldown', primaryMuscles: ['lats'], secondaryMuscles: [], equipment: 'cable', movementType: 'isolation' },
+  { name: 'Machine Row', primaryMuscles: ['back'], secondaryMuscles: ['biceps'], equipment: 'machine', movementType: 'horizontal_pull' },
+
+  // Shoulders
+  { name: 'Dumbbell Lateral Raise', primaryMuscles: ['shoulders'], secondaryMuscles: [], equipment: 'dumbbell', movementType: 'isolation' },
+  { name: 'Cable Lateral Raise', primaryMuscles: ['shoulders'], secondaryMuscles: [], equipment: 'cable', movementType: 'isolation' },
+  { name: 'Rear Delt Fly', primaryMuscles: ['shoulders'], secondaryMuscles: ['back'], equipment: 'dumbbell', movementType: 'isolation' },
+  { name: 'Front Raise', primaryMuscles: ['shoulders'], secondaryMuscles: [], equipment: 'dumbbell', movementType: 'isolation' },
+
+  // Arms
+  { name: 'Hammer Curl', primaryMuscles: ['biceps'], secondaryMuscles: ['forearms'], equipment: 'dumbbell', movementType: 'isolation' },
+  { name: 'Incline Dumbbell Curl', primaryMuscles: ['biceps'], secondaryMuscles: [], equipment: 'dumbbell', movementType: 'isolation' },
+  { name: 'Preacher Curl', primaryMuscles: ['biceps'], secondaryMuscles: [], equipment: 'barbell', movementType: 'isolation' },
+  { name: 'Cable Curl', primaryMuscles: ['biceps'], secondaryMuscles: [], equipment: 'cable', movementType: 'isolation' },
+  { name: 'Overhead Triceps Extension', primaryMuscles: ['triceps'], secondaryMuscles: [], equipment: 'dumbbell', movementType: 'isolation' },
+  { name: 'Skull Crusher', primaryMuscles: ['triceps'], secondaryMuscles: [], equipment: 'barbell', movementType: 'isolation' },
+  { name: 'Close-Grip Bench Press', primaryMuscles: ['triceps'], secondaryMuscles: ['chest', 'shoulders'], equipment: 'barbell', movementType: 'horizontal_push' },
+
+  // Legs
+  { name: 'Front Squat', primaryMuscles: ['quads'], secondaryMuscles: ['glutes'], equipment: 'barbell', movementType: 'squat' },
+  { name: 'Goblet Squat', primaryMuscles: ['quads'], secondaryMuscles: ['glutes'], equipment: 'dumbbell', movementType: 'squat' },
+  { name: 'Bulgarian Split Squat', primaryMuscles: ['quads'], secondaryMuscles: ['glutes', 'hamstrings'], equipment: 'dumbbell', movementType: 'squat' },
+  { name: 'Walking Lunge', primaryMuscles: ['quads'], secondaryMuscles: ['glutes', 'hamstrings'], equipment: 'dumbbell', movementType: 'squat' },
+  { name: 'Reverse Lunge', primaryMuscles: ['quads'], secondaryMuscles: ['glutes', 'hamstrings'], equipment: 'dumbbell', movementType: 'squat' },
+  { name: 'Leg Extension', primaryMuscles: ['quads'], secondaryMuscles: [], equipment: 'machine', movementType: 'isolation' },
+  { name: 'Stiff-Leg Deadlift', primaryMuscles: ['hamstrings'], secondaryMuscles: ['glutes', 'back'], equipment: 'barbell', movementType: 'hinge' },
+  { name: 'Good Morning', primaryMuscles: ['hamstrings'], secondaryMuscles: ['glutes', 'back'], equipment: 'barbell', movementType: 'hinge' },
+  { name: 'Hip Thrust', primaryMuscles: ['glutes'], secondaryMuscles: ['hamstrings'], equipment: 'barbell', movementType: 'hinge' },
+  { name: 'Glute Bridge', primaryMuscles: ['glutes'], secondaryMuscles: ['hamstrings'], equipment: 'bodyweight', movementType: 'hinge' },
+  { name: 'Seated Calf Raise', primaryMuscles: ['calves'], secondaryMuscles: [], equipment: 'machine', movementType: 'isolation' },
+
+  // Core
+  { name: 'Side Plank', primaryMuscles: ['obliques'], secondaryMuscles: ['abs'], equipment: 'bodyweight', movementType: 'core' },
+  { name: 'Hanging Leg Raise', primaryMuscles: ['abs'], secondaryMuscles: [], equipment: 'bodyweight', movementType: 'core' },
+  { name: 'Cable Crunch', primaryMuscles: ['abs'], secondaryMuscles: [], equipment: 'cable', movementType: 'core' },
+  { name: 'Ab Wheel Rollout', primaryMuscles: ['abs'], secondaryMuscles: ['shoulders'], equipment: 'other', movementType: 'core' },
+  { name: 'Reverse Crunch', primaryMuscles: ['abs'], secondaryMuscles: [], equipment: 'bodyweight', movementType: 'core' }
 ];
 
 if (typeof module !== 'undefined' && module.exports) module.exports = App.exerciseSeedData;

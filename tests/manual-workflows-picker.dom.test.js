@@ -88,5 +88,8 @@ test('Picker QA: archived exercises never appear in the picker', async () => {
   await wait(30);
 
   const names = Array.from(document.querySelectorAll('.modal-list-item')).map(b => b.textContent);
-  assert.ok(!names.some(n => /Plank/.test(n)), 'archived exercise must not appear in the picker');
+  // Exact match, not a substring test: the library now also has "Side
+  // Plank" as a distinct, non-archived exercise, which a loose /Plank/
+  // regex would incorrectly flag.
+  assert.ok(!names.some(n => n === 'Plank'), 'archived exercise must not appear in the picker');
 });

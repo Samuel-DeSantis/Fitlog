@@ -7,7 +7,13 @@ async function addExercise(document, name) {
   await wait(20);
   setValue(document.querySelector('.modal-search'), name);
   await wait(20);
-  click(document.querySelector('.modal-list-item'));
+  // Prefer an exact-name match over "first result": the library now has
+  // several other exercises whose names also contain a short search term
+  // like "Squat" (e.g. "Bulgarian Split Squat"), which the substring
+  // search also (correctly) surfaces.
+  const items = [...document.querySelectorAll('.modal-list-item')];
+  const exact = items.find(el => el.textContent.trim() === name);
+  click(exact || items[0]);
   await wait(30);
 }
 

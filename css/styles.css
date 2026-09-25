@@ -316,8 +316,16 @@ button:disabled { opacity: 0.5; cursor: default; }
   gap: var(--space-3);
 }
 
-.prescription-field {
+/* Specificity note: these are <label> elements inside .modal-form, and
+   ".modal-form label" (a class + an element selector) outranks a
+   single-class selector like ".prescription-field" alone, which would
+   otherwise silently inherit that rule's flex-direction: column and
+   stack "Sets"/"Reps" above their inputs instead of beside them. The
+   .prescription-row ancestor is added here purely to win that
+   specificity fight — the layout itself is still row/inline. */
+.prescription-row .prescription-field {
   display: flex;
+  flex-direction: row;
   align-items: center;
   flex-shrink: 0;
   gap: 6px;
@@ -361,7 +369,7 @@ button:disabled { opacity: 0.5; cursor: default; }
    slightly rather than letting Sets/Reps wrap onto separate lines. */
 @media (max-width: 340px) {
   .prescription-row { gap: var(--space-2); }
-  .prescription-field { gap: 4px; }
+  .prescription-row .prescription-field { gap: 4px; }
   .prescription-input { width: 34px; }
   .prescription-input-narrow { width: 30px; }
   .prescription-unit { font-size: 12px; }

@@ -88,10 +88,12 @@ App.views = App.views || {};
       </div>
       <div class="section">
         <h2>Best Weight Over Time</h2>
+        <p class="section-note">Weight (lb) · Workout date/history</p>
         ${chartHtml(weightSeries)}
       </div>
       <div class="section">
         <h2>Volume Over Time</h2>
+        <p class="section-note">Volume (lb × reps) · Workout date/history</p>
         ${chartHtml(volumeSeries)}
       </div>
       <div class="section">
