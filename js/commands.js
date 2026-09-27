@@ -44,7 +44,8 @@ App.commands = (function () {
       for (let i = 0; i < count; i++) {
         sets.push({
           id: utils.uuid(), workoutId, exerciseId: entry.exerciseId, setOrder: i,
-          weight: null, reps: null, completedAt: null
+          weight: null, reps: null, completedAt: null,
+          createdAt: utils.nowISO(), updatedAt: utils.nowISO()
         });
       }
     });
@@ -230,7 +231,8 @@ App.commands = (function () {
 
       const set = {
         id: utils.uuid(), workoutId, exerciseId, setOrder: forExercise.length,
-        weight: copyWeight, reps: copyReps, completedAt: null
+        weight: copyWeight, reps: copyReps, completedAt: null,
+        createdAt: utils.nowISO(), updatedAt: utils.nowISO()
       };
       store.put(set);
       return set;
@@ -249,6 +251,7 @@ App.commands = (function () {
     if ('weight' in fields) set.weight = fields.weight;
     if ('reps' in fields) set.reps = fields.reps;
     set.completedAt = (set.weight != null && set.reps != null) ? (set.completedAt || utils.nowISO()) : null;
+    set.updatedAt = utils.nowISO();
     await db.put('sets', set);
     return set;
   }
@@ -261,6 +264,7 @@ App.commands = (function () {
     if (!set) return null;
     if (completed && (set.weight == null || set.reps == null)) return set;
     set.completedAt = completed ? (set.completedAt || utils.nowISO()) : null;
+    set.updatedAt = utils.nowISO();
     await db.put('sets', set);
     return set;
   }
@@ -533,6 +537,7 @@ App.commands = (function () {
   async function setUnit(unit) {
     const settings = await App.queries.getSettings();
     settings.unit = unit;
+    settings.updatedAt = utils.nowISO();
     await db.put('settings', settings);
     return settings;
   }
@@ -540,6 +545,7 @@ App.commands = (function () {
   async function setBodyweight(value) {
     const settings = await App.queries.getSettings();
     settings.bodyweight = value;
+    settings.updatedAt = utils.nowISO();
     await db.put('settings', settings);
     return settings;
   }

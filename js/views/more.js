@@ -6,6 +6,13 @@ App.views = App.views || {};
     const settings = await App.queries.getSettings();
     const exercises = (await App.queries.getExercises()).sort((a, b) => a.name.localeCompare(b.name));
 
+    // Phase 6: cloud is entirely optional. `cloudClient` is null when
+    // this deployment has no js/cloud/config.js values filled in, or the
+    // Supabase SDK script didn't load (e.g. offline) — either way FitLog
+    // itself is completely unaffected; only these two sections change.
+    const cloudClient = App.cloud.getClient();
+    const cloudUser = cloudClient ? App.cloud.auth.getUser() : null;
+
     container.innerHTML = `
       <div class="view-header"><h1>More</h1></div>
 
@@ -37,6 +44,35 @@ App.views = App.views || {};
         </div>
         <button class="btn-secondary" id="add-exercise-btn" style="margin-top:12px">+ Add Exercise</button>
       </div>
+
+      <div class="section">
+        <h2>Account</h2>
+        ${!cloudClient ? `
+          <p class="section-note">Cloud sync isn't set up for this deployment yet.</p>
+        ` : !cloudUser ? `
+          <p class="section-note">Sign in to back up your data to the cloud, or restore it on a new device.</p>
+          <div class="modal-form" style="max-width:280px">
+            <input type="email" id="auth-email" placeholder="Email" autocomplete="email">
+            <input type="password" id="auth-password" placeholder="Password" autocomplete="current-password">
+          </div>
+          <button class="btn-secondary" id="auth-signin-btn">Sign In</button>
+          <button class="btn-secondary" id="auth-signup-btn">Create Account</button>
+          <div id="auth-status"></div>
+        ` : `
+          <p class="section-note">Signed in as ${App.utils.escapeHtml(cloudUser.email || '')}</p>
+          <button class="btn-secondary" id="auth-signout-btn">Sign Out</button>
+        `}
+      </div>
+
+      ${cloudClient && cloudUser ? `
+        <div class="section">
+          <h2>Cloud</h2>
+          <p class="section-note">Backing up never deletes anything already in the cloud — it only adds or updates your records there.</p>
+          <button class="btn-secondary" id="cloud-backup-btn">Back Up Data</button>
+          <button class="btn-secondary" id="cloud-restore-btn">Restore from Cloud</button>
+          <div id="cloud-status"></div>
+        </div>
+      ` : ''}
 
       <div class="section">
         <h2>Data</h2>
@@ -121,5 +157,101 @@ App.views = App.views || {};
       alert('All data cleared.');
       App.views.more(container);
     });
+
+    // ---- Phase 6: Account (sign up / sign in / sign out) ----
+    const authStatusEl = container.querySelector('#auth-status');
+
+    const signInBtn = container.querySelector('#auth-signin-btn');
+    if (signInBtn) {
+      signInBtn.addEventListener('click', async () => {
+        const email = container.querySelector('#auth-email').value.trim();
+        const password = container.querySelector('#auth-password').value;
+        if (!email || !password) {
+          authStatusEl.innerHTML = '<p class="section-note">Enter an email and password.</p>';
+          return;
+        }
+        try {
+          await App.cloud.auth.signIn(email, password);
+          App.views.more(container);
+        } catch (err) {
+          authStatusEl.innerHTML = `<p class="section-note">${App.utils.escapeHtml(err.message || 'Sign in failed.')}</p>`;
+        }
+      });
+    }
+
+    const signUpBtn = container.querySelector('#auth-signup-btn');
+    if (signUpBtn) {
+      signUpBtn.addEventListener('click', async () => {
+        const email = container.querySelector('#auth-email').value.trim();
+        const password = container.querySelector('#auth-password').value;
+        if (!email || !password) {
+          authStatusEl.innerHTML = '<p class="section-note">Enter an email and password.</p>';
+          return;
+        }
+        try {
+          const { confirmationRequired } = await App.cloud.auth.signUp(email, password);
+          if (confirmationRequired) {
+            authStatusEl.innerHTML = '<p class="section-note">Check your email to confirm your account, then sign in.</p>';
+          } else {
+            App.views.more(container);
+          }
+        } catch (err) {
+          authStatusEl.innerHTML = `<p class="section-note">${App.utils.escapeHtml(err.message || 'Could not create account.')}</p>`;
+        }
+      });
+    }
+
+    const signOutBtn = container.querySelector('#auth-signout-btn');
+    if (signOutBtn) {
+      signOutBtn.addEventListener('click', async () => {
+        await App.cloud.auth.signOut();
+        App.views.more(container);
+      });
+    }
+
+    // ---- Phase 6: Cloud backup / restore ----
+    const cloudStatusEl = container.querySelector('#cloud-status');
+
+    const backupBtn = container.querySelector('#cloud-backup-btn');
+    if (backupBtn) {
+      backupBtn.addEventListener('click', async () => {
+        backupBtn.disabled = true;
+        cloudStatusEl.innerHTML = '<p class="section-note">Backing up…</p>';
+        try {
+          const counts = await App.cloud.backup.backupAll();
+          const summary = Object.entries(counts).filter(([, n]) => n > 0).map(([store, n]) => `${n} ${store}`).join(', ');
+          cloudStatusEl.innerHTML = `<p class="section-note">Backup complete${summary ? ' — ' + App.utils.escapeHtml(summary) : ''}.</p>`;
+        } catch (err) {
+          cloudStatusEl.innerHTML = `<p class="section-note">Backup failed — ${App.utils.escapeHtml(err.message || 'unknown error')}. Nothing on this device was changed.</p>`;
+        } finally {
+          backupBtn.disabled = false;
+        }
+      });
+    }
+
+    const restoreBtn = container.querySelector('#cloud-restore-btn');
+    if (restoreBtn) {
+      restoreBtn.addEventListener('click', async () => {
+        // Mirrors the existing file-import confirmation exactly: restore
+        // can alter or replace data already on this device, so explicit
+        // confirmation (and an explicit merge/replace choice) is always
+        // required before it runs — never a silent overwrite.
+        const replace = confirm(
+          'Restore from Cloud?\n\nThis can overwrite data already on this device with the cloud version.\n\n' +
+          'OK = replace everything on this device with the cloud backup\nCancel = merge cloud data with what\'s already here'
+        );
+        restoreBtn.disabled = true;
+        cloudStatusEl.innerHTML = '<p class="section-note">Restoring…</p>';
+        try {
+          await App.cloud.restore.restoreAll(replace ? 'replace' : 'merge');
+          alert('Restore complete.');
+          App.views.more(container);
+        } catch (err) {
+          cloudStatusEl.innerHTML = `<p class="section-note">Restore failed — ${App.utils.escapeHtml(err.message || 'unknown error')}. Nothing on this device was changed.</p>`;
+        } finally {
+          restoreBtn.disabled = false;
+        }
+      });
+    }
   };
 })();

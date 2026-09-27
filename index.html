@@ -44,6 +44,24 @@
   <script src="js/analytics.js"></script>
   <script src="js/progress.js"></script>
   <script src="js/seed.js"></script>
+
+  <!-- Supabase cloud foundation. Both of these are optional — running
+       without them (e.g. offline, or before you've filled in
+       js/cloud/config.js) is a fully supported, fully local mode; see
+       that file and supabase/schema.sql for setup.
+       Pinned to an EXACT version, not a floating "@2" major-version
+       alias or unpinned "latest" — a CDN-loaded script tag has no
+       lockfile of its own to otherwise guarantee reproducible auth/
+       security behavior, so this URL is the only pin there is. Bump
+       it deliberately (see docs/cloud-setup.md's "Supabase JS version
+       pinning" section) rather than letting it float. -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2"></script>
+  <script src="js/cloud/config.js"></script>
+  <script src="js/cloud/supabaseClient.js"></script>
+  <script src="js/cloud/auth.js"></script>
+  <script src="js/cloud/backup.js"></script>
+  <script src="js/cloud/restore.js"></script>
+
   <script src="js/router.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/views/today.js"></script>

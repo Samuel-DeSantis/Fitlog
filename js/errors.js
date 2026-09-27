@@ -25,6 +25,33 @@ class ActiveWorkoutConflictError extends Error {
   }
 }
 
-App.errors = { MultipleActiveWorkoutsError, ActiveWorkoutConflictError };
+// Thrown by any App.cloud operation that needs a working, signed-in
+// Supabase client (backup, restore) when one isn't available — cloud
+// isn't configured for this deployment, the Supabase SDK script didn't
+// load, or no one is signed in. Callers surface this as a normal
+// message; it never corrupts or touches local IndexedDB data.
+class CloudUnavailableError extends Error {
+  constructor(reason) {
+    super(reason || 'Cloud sync is not available right now.');
+    this.name = 'CloudUnavailableError';
+  }
+}
+
+// Wraps a Supabase error encountered while backing up or restoring one
+// specific store, so the More screen can say what failed without the
+// caller needing to know Postgres/Supabase error shapes.
+class CloudSyncError extends Error {
+  constructor(storeName, cause) {
+    super(`Cloud sync failed while syncing "${storeName}": ${(cause && cause.message) || cause}`);
+    this.name = 'CloudSyncError';
+    this.storeName = storeName;
+    this.cause = cause;
+  }
+}
+
+App.errors = {
+  MultipleActiveWorkoutsError, ActiveWorkoutConflictError,
+  CloudUnavailableError, CloudSyncError
+};
 
 if (typeof module !== 'undefined' && module.exports) module.exports = App.errors;

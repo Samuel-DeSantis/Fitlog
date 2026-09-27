@@ -18,6 +18,16 @@
       navigator.storage.persist().catch(() => {});
     }
 
+    // Cloud auth is best-effort and must never block local use: if
+    // Supabase isn't configured (see js/cloud/config.js), the SDK
+    // script didn't load, or the network is unavailable, the app boots
+    // exactly as it always has, fully usable while signed out.
+    try {
+      await App.cloud.auth.init();
+    } catch (e) {
+      // swallow — local-first behavior is unaffected either way.
+    }
+
     await App.router.init();
   }
 

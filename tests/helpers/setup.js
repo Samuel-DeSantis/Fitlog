@@ -13,7 +13,11 @@ const SOURCE_FILES = [
   '../../js/commands.js',
   '../../js/analytics.js',
   '../../js/progress.js',
-  '../../js/seed.js'
+  '../../js/seed.js',
+  '../../js/cloud/supabaseClient.js',
+  '../../js/cloud/auth.js',
+  '../../js/cloud/backup.js',
+  '../../js/cloud/restore.js'
 ];
 
 function freshApp() {
