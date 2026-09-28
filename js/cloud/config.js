@@ -21,6 +21,6 @@
 // Cloud sections explain that cloud sync isn't set up for this
 // deployment rather than showing broken sign-in fields.
 window.FITLOG_SUPABASE_CONFIG = {
-  url: '',
-  anonKey: ''
+  url: 'https://iibfunhnvddhtpkfptqe.supabase.co',
+  anonKey: 'sb_publishable_8S1iiIkGz-vefZn5EAKVFA_f4sMJfNf'
 };
