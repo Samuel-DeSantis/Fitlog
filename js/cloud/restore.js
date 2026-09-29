@@ -124,7 +124,7 @@ App.cloud.restore = (function () {
   // import's merge behavior) or 'replace' (destructive: clears local
   // data first). The UI is responsible for getting explicit user
   // confirmation before ever calling this with 'replace' — see
-  // views/more.js. Malformed cloud data (missing required fields,
+  // views/account.js. Malformed cloud data (missing required fields,
   // wrong shapes) is caught by App.db.importAll's own validation and
   // rejected before anything is written, exactly as a bad JSON import
   // file already is.

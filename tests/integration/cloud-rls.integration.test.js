@@ -10,7 +10,7 @@
 //
 // Run with:
 //   SUPABASE_TEST_URL=https://xxxx.supabase.co \
-//   SUPABASE_TEST_ANON_KEY=your-anon-key \
+//   SUPABASE_TEST_PUBLISHABLE_KEY=your-publishable-key \
 //   SUPABASE_TEST_USER_A_EMAIL=a@test.com SUPABASE_TEST_USER_A_PASSWORD=... \
 //   SUPABASE_TEST_USER_B_EMAIL=b@test.com SUPABASE_TEST_USER_B_PASSWORD=... \
 //   npm run test:cloud-integration
@@ -25,7 +25,7 @@ const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 
 const REQUIRED_ENV = [
-  'SUPABASE_TEST_URL', 'SUPABASE_TEST_ANON_KEY',
+  'SUPABASE_TEST_URL', 'SUPABASE_TEST_PUBLISHABLE_KEY',
   'SUPABASE_TEST_USER_A_EMAIL', 'SUPABASE_TEST_USER_A_PASSWORD',
   'SUPABASE_TEST_USER_B_EMAIL', 'SUPABASE_TEST_USER_B_PASSWORD'
 ];
@@ -42,7 +42,7 @@ if (!skip) {
 }
 
 async function signInAsClient(email, password) {
-  const client = createClient(process.env.SUPABASE_TEST_URL, process.env.SUPABASE_TEST_ANON_KEY);
+  const client = createClient(process.env.SUPABASE_TEST_URL, process.env.SUPABASE_TEST_PUBLISHABLE_KEY);
   const { data, error } = await client.auth.signInWithPassword({ email, password });
   if (error) throw new Error(`Could not sign in test user ${email}: ${error.message}`);
   return { client, user: data.user };

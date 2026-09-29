@@ -53,6 +53,11 @@ App.views = App.views || {};
       </div>
       <div id="exercise-blocks">${blocksHtml || '<p class="empty-hint">No exercises yet. Add one below.</p>'}</div>
       <button class="btn-secondary" id="add-exercise-btn">+ Add Exercise</button>
+      <div class="section" id="workout-notes-section">
+        <h2>Workout Notes</h2>
+        <p class="section-note">How did the workout feel? Anything you want to remember or tell your future coach?</p>
+        <div class="modal-form"><textarea id="workout-notes-input" rows="3">${App.utils.escapeHtml(workout.notes || '')}</textarea></div>
+      </div>
       ${isActive ? `
         <button class="btn-primary" id="finish-workout-btn">Finish Workout</button>
         <button class="btn-text" id="cancel-workout-btn">Cancel Workout</button>
@@ -69,6 +74,29 @@ App.views = App.views || {};
 
     const notesBtn = container.querySelector('#notes-preview-btn');
     if (notesBtn) notesBtn.addEventListener('click', () => openEditMetaModal(workout, 'notes'));
+
+    // Notes save on change (blur) without re-rendering, so a tap on
+    // Finish/Save that caused the blur is never swallowed by a redraw.
+    // The header preview is patched in place to stay in step.
+    const notesInput = container.querySelector('#workout-notes-input');
+    async function saveNotes() {
+      const value = notesInput.value;
+      if (value === (workout.notes || '')) return;
+      await App.commands.editWorkoutMeta(workout.id, { notes: value });
+      workout.notes = value;
+      const trimmed = value.trim();
+      let preview = container.querySelector('#notes-preview-btn');
+      if (!trimmed) { if (preview) preview.remove(); return; }
+      if (!preview) {
+        preview = document.createElement('button');
+        preview.className = 'workout-notes-preview';
+        preview.id = 'notes-preview-btn';
+        preview.addEventListener('click', () => openEditMetaModal(workout, 'notes'));
+        container.querySelector('.view-header').appendChild(preview);
+      }
+      preview.textContent = 'Notes: ' + truncateNotes(trimmed, 90);
+    }
+    notesInput.addEventListener('change', saveNotes);
 
     container.querySelector('#add-exercise-btn').addEventListener('click', () => {
       App.ui.openExercisePicker(workout.exerciseOrder, async (ex) => {
@@ -91,6 +119,7 @@ App.views = App.views || {};
           );
           if (!proceed) return;
         }
+        await saveNotes(); // flush any note typed but not yet blurred
         await App.commands.finishWorkout(workout.id);
         App.router.go('/today');
       });

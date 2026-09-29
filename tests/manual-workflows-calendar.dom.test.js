@@ -92,7 +92,7 @@ test('Calendar QA: backfilling a past date creates a completed workout editable 
   click(cell);
   await wait(60);
 
-  assert.ok(document.getElementById('add-workout-btn'), '+ Add Workout should be offered for a past date');
+  assert.ok(document.getElementById('add-workout-btn'), '+ Record Workout should be offered for a past date');
   click(document.getElementById('add-workout-btn'));
   await wait(40);
   click(document.querySelector('[data-blank]'));
@@ -232,4 +232,45 @@ test('Calendar QA: the header is sticky, but each month has its own (non-sticky)
     assert.equal(heading.nextElementSibling, weekdays, "the weekday row sits directly under this month's own heading");
     assert.equal(weekdays.nextElementSibling.classList.contains('calendar-grid'), true, "the day grid follows this month's weekday row");
   });
+});
+
+test('Calendar day sheet: past dates offer only + Record Workout; today keeps Plan + Add; future keeps only Plan', async () => {
+  const { document, App } = await bootRealApp();
+  const today = App.utils.todayLocalISO();
+
+  document.location.hash = '/calendar';
+  await wait(60);
+  const dates = [...document.querySelectorAll('.calendar-day[data-date]')].map(c => c.dataset.date);
+  const past = dates.filter(d => d < today).pop();
+  const future = dates.find(d => d > today);
+
+  async function openDay(date) {
+    click(document.querySelector(`.calendar-day[data-date="${date}"]`));
+    await wait(60);
+    const text = document.querySelector('.modal-sheet').textContent;
+    const plan = document.getElementById('plan-workout-btn');
+    const add = document.getElementById('add-workout-btn');
+    return { text, plan, add, close: () => document.querySelector('.modal-close').dispatchEvent(new global.window.Event('click', { bubbles: true })) };
+  }
+
+  if (past) {
+    const d = await openDay(past);
+    assert.equal(d.plan, null, 'no Plan Workout on a past date');
+    assert.doesNotMatch(d.text, /Plan Workout/);
+    assert.ok(d.add);
+    assert.equal(d.add.textContent.trim(), '+ Record Workout');
+    d.close();
+  }
+
+  const t = await openDay(today);
+  assert.equal(t.plan.textContent.trim(), '+ Plan Workout');
+  assert.equal(t.add.textContent.trim(), '+ Add Workout');
+  t.close();
+
+  if (future) {
+    const f = await openDay(future);
+    assert.equal(f.plan.textContent.trim(), '+ Plan Workout');
+    assert.equal(f.add, null, 'future dates still have no add/record button');
+    assert.doesNotMatch(f.text, /Record Workout/);
+  }
 });

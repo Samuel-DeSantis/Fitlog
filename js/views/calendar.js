@@ -168,7 +168,9 @@ App.views = App.views || {};
       `);
     });
 
-    const isPastOrToday = dateStr <= App.utils.todayLocalISO();
+    const todayStr = App.utils.todayLocalISO();
+    const isPast = dateStr < todayStr;
+    const isPastOrToday = dateStr <= todayStr;
 
     const overlay = App.utils.el(`
       <div class="modal-overlay">
@@ -178,8 +180,8 @@ App.views = App.views || {};
             <button class="modal-close">×</button>
           </div>
           ${rowsHtml.length ? rowsHtml.join('') : '<p class="empty-hint">Nothing planned or logged on this date.</p>'}
-          <button class="btn-secondary" id="plan-workout-btn" style="margin-top:16px">+ Plan Workout</button>
-          ${isPastOrToday ? '<button class="btn-secondary" id="add-workout-btn">+ Add Workout</button>' : ''}
+          ${isPast ? '' : '<button class="btn-secondary" id="plan-workout-btn" style="margin-top:16px">+ Plan Workout</button>'}
+          ${isPastOrToday ? `<button class="btn-secondary" id="add-workout-btn"${isPast ? ' style="margin-top:16px"' : ''}>${isPast ? '+ Record Workout' : '+ Add Workout'}</button>` : ''}
         </div>
       </div>
     `);
@@ -237,19 +239,22 @@ App.views = App.views || {};
       });
     });
 
-    overlay.querySelector('#plan-workout-btn').addEventListener('click', () => {
-      overlay.remove();
-      openSessionPicker('Plan Workout', async (session) => {
-        await App.commands.planCalendarEntry(dateStr, session ? session.id : null);
-        App.router.render();
+    const planWorkoutBtn = overlay.querySelector('#plan-workout-btn');
+    if (planWorkoutBtn) {
+      planWorkoutBtn.addEventListener('click', () => {
+        overlay.remove();
+        openSessionPicker('Plan Workout', async (session) => {
+          await App.commands.planCalendarEntry(dateStr, session ? session.id : null);
+          App.router.render();
+        });
       });
-    });
+    }
 
     const addWorkoutBtn = overlay.querySelector('#add-workout-btn');
     if (addWorkoutBtn) {
       addWorkoutBtn.addEventListener('click', () => {
         overlay.remove();
-        openSessionPicker('Add Workout', async (session) => {
+        openSessionPicker(isPast ? 'Record Workout' : 'Add Workout', async (session) => {
           const workout = await App.commands.backfillWorkout(dateStr, session ? session.id : null);
           App.router.go('/workout/' + workout.id);
         });

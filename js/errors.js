@@ -32,17 +32,17 @@ class ActiveWorkoutConflictError extends Error {
 // message; it never corrupts or touches local IndexedDB data.
 class CloudUnavailableError extends Error {
   constructor(reason) {
-    super(reason || 'Cloud sync is not available right now.');
+    super(reason || 'Cloud backup is not available right now.');
     this.name = 'CloudUnavailableError';
   }
 }
 
 // Wraps a Supabase error encountered while backing up or restoring one
-// specific store, so the More screen can say what failed without the
+// specific store, so the Account screen can say what failed without the
 // caller needing to know Postgres/Supabase error shapes.
 class CloudSyncError extends Error {
   constructor(storeName, cause) {
-    super(`Cloud sync failed while syncing "${storeName}": ${(cause && cause.message) || cause}`);
+    super(`Cloud backup failed while processing "${storeName}": ${(cause && cause.message) || cause}`);
     this.name = 'CloudSyncError';
     this.storeName = storeName;
     this.cause = cause;

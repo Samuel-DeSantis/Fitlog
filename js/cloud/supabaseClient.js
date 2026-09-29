@@ -13,14 +13,15 @@ window.App = window.App || {};
 // Configuration: index.html loads (in order)
 //   1. the Supabase UMD SDK from a CDN (defines window.supabase)
 //   2. js/cloud/config.js, which sets window.FITLOG_SUPABASE_CONFIG =
-//      { url, anonKey } — see that file for setup instructions.
+//      { url, publishableKey } — see that file for setup instructions.
 // Both are optional. Running without either is a fully supported
-// configuration: FitLog works entirely locally, and the More screen's
-// Account/Cloud sections explain that cloud sync isn't set up rather
+// configuration: FitLog works entirely locally, and the Account screen's
+// Account/Cloud sections explain that cloud features are unavailable rather
 // than showing broken sign-in fields.
 //
-// IMPORTANT: url/anonKey are the public Supabase "anon" key, which is
-// SAFE to ship in frontend code by design — every table it can reach
+// IMPORTANT: publishableKey is the Supabase publishable key (formerly
+// the "anon" / "public" key; a legacy anonKey field is still accepted),
+// which is SAFE to ship in frontend code by design — every table it can reach
 // is still gated by Postgres Row Level Security (see
 // supabase/schema.sql). Never put a service-role key anywhere in this
 // app.
@@ -33,9 +34,15 @@ App.cloud = (function () {
     return (typeof window !== 'undefined' && window.FITLOG_SUPABASE_CONFIG) || {};
   }
 
+  // Prefer the current publishableKey; fall back to the legacy anonKey so
+  // existing configs keep working unchanged.
+  function keyOf(c) {
+    return c.publishableKey || c.anonKey;
+  }
+
   function isConfigured() {
     const c = getConfig();
-    return !!(c.url && c.anonKey);
+    return !!(c.url && keyOf(c));
   }
 
   function sdkAvailable() {
@@ -52,10 +59,10 @@ App.cloud = (function () {
     if (!isConfigured() || !sdkAvailable()) return null;
 
     const config = getConfig();
-    const configKey = config.url + '|' + config.anonKey;
+    const configKey = config.url + '|' + keyOf(config);
     if (cachedClient && cachedConfigKey === configKey) return cachedClient;
 
-    cachedClient = window.supabase.createClient(config.url, config.anonKey, {
+    cachedClient = window.supabase.createClient(config.url, keyOf(config), {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
     });
     cachedConfigKey = configKey;

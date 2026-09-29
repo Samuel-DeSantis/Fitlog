@@ -11,7 +11,7 @@ const SHELL_HTML = `
     <button class="nav-tab" data-route="/train"><span>Train</span></button>
     <button class="nav-tab" data-route="/calendar"><span>Calendar</span></button>
     <button class="nav-tab" data-route="/progress"><span>Progress</span></button>
-    <button class="nav-tab" data-route="/more"><span>More</span></button>
+    <button class="nav-tab" data-route="/account"><span>Account</span></button>
   </nav>
 </body></html>
 `;
@@ -40,7 +40,7 @@ const SOURCE_FILES = [
   '../../js/views/workout.js',
   '../../js/views/calendar.js',
   '../../js/views/progress.js',
-  '../../js/views/more.js',
+  '../../js/views/account.js',
   '../../js/app.js'
 ];
 

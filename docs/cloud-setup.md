@@ -5,7 +5,7 @@ for a FitLog deployment, the security model (including a subsequent
 hardening pass), and the architecture future sync work would build on.
 FitLog itself needs none of this to run — signed out, with no Supabase
 project configured at all, every existing feature (Today, Train,
-Calendar, Progress, More) works exactly as before.
+Calendar, Progress, Account) works exactly as before.
 
 ## Status
 
@@ -46,26 +46,27 @@ bug — file it as such.
    mapping from IndexedDB stores to these tables. It's written to be
    safe to re-run, including on a project that already ran an earlier
    version of this same file (see §3 for why that matters).
-3. In **Project Settings → API**, copy your **Project URL** and **anon
-   / public key**.
+3. In **Project Settings → API**, copy your **Project URL** and **publishable
+   key** (formerly the "anon" / "public" key; a legacy `anonKey` field
+   in `config.js` is still accepted).
 4. Fill both into `js/cloud/config.js`:
    ```js
    window.FITLOG_SUPABASE_CONFIG = {
      url: 'https://xxxxxxxxxxxx.supabase.co',
-     anonKey: 'ey...'
+     publishableKey: 'sb_publishable_...'
    };
    ```
-   The anon key is safe to ship in frontend code — it only ever grants
+   The publishable key is safe to ship in frontend code — it only ever grants
    what the RLS policies allow (a signed-in user's own rows). **Never**
    put a service-role key anywhere in this app.
 5. (Optional) In **Authentication → Providers → Email**, decide whether
    to require email confirmation. FitLog's sign-up flow handles both:
-   if confirmation is required, the More screen tells the person to
+   if confirmation is required, the Account screen tells the person to
    check their email instead of assuming they're signed in.
 
 Leaving `js/cloud/config.js` blank is a supported configuration —
-FitLog runs fully locally, and the More screen's Account section says
-cloud sync isn't set up rather than showing broken sign-in fields.
+FitLog runs fully locally, and the Account screen's Account section says
+cloud features are unavailable (local-only mode) rather than showing broken sign-in fields.
 
 ## 2. What "local-first" means here
 
@@ -76,7 +77,7 @@ cloud sync isn't set up rather than showing broken sign-in fields.
   `try/catch` — if Supabase isn't configured, the SDK script didn't
   load, or the network is down, the app boots exactly as it always has.
 - Backup and restore are both **explicit, user-initiated actions** in
-  More → Account/Cloud. Nothing runs automatically or in the
+  Account → Cloud. Nothing runs automatically or in the
   background.
 
 ## 3. Tenant-scoped relationship integrity
@@ -160,7 +161,7 @@ gives cloud restore, for free:
 - No duplicate records on repeated restores (`put()`, not `add()`).
 
 **Merge** (default) adds/updates records without first clearing
-anything. **Replace** clears every local store first — the More screen
+anything. **Replace** clears every local store first — the Account screen
 always asks for explicit confirmation before either runs, since even
 merge can overwrite a locally-newer record sharing an ID with an
 older cloud one (see §9's noted limitation).
@@ -242,14 +243,14 @@ phase would need.
   offline.
 - **Realtime**: Supabase's realtime subscriptions could push a
   "something changed elsewhere" signal to trigger a background sync,
-  rather than requiring the person to open More and tap the buttons.
+  rather than requiring the person to open Account and tap the buttons.
 
 None of the above is implemented now — see the Status section above.
 
 ## 7. Security review checklist
 
 - [x] No service-role key exists anywhere in this app —
-  `js/cloud/config.js` only ever holds the public anon key.
+  `js/cloud/config.js` only ever holds the publishable key.
 - [x] RLS is enabled on all six tables (`supabase/schema.sql`).
 - [x] Every RLS policy checks `auth.uid() = user_id` — never a
   client-supplied value. `with check` (not just `using`) is present on
@@ -281,7 +282,7 @@ in order of how close each gets to the real, deployed thing:
 3. Run:
    ```
    SUPABASE_TEST_URL=https://xxxx.supabase.co \
-   SUPABASE_TEST_ANON_KEY=your-anon-key \
+   SUPABASE_TEST_PUBLISHABLE_KEY=your-publishable-key \
    SUPABASE_TEST_USER_A_EMAIL=a@test.com SUPABASE_TEST_USER_A_PASSWORD=... \
    SUPABASE_TEST_USER_B_EMAIL=b@test.com SUPABASE_TEST_USER_B_PASSWORD=... \
    npm run test:cloud-integration
@@ -299,7 +300,7 @@ in order of how close each gets to the real, deployed thing:
 
 Sign in as two different accounts (two browser profiles, or one
 browser + one incognito window) against the same project, back up
-different data from each, and confirm neither account's More screen
+different data from each, and confirm neither account's Account screen
 ever shows the other's data after Restore.
 
 ### 7.3 Local, no Supabase project needed

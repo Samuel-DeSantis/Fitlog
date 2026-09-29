@@ -2,7 +2,7 @@ window.App = window.App || {};
 App.cloud = App.cloud || {};
 
 // Thin wrapper around Supabase Auth. Nothing outside App.cloud.* ever
-// touches a Supabase client directly for auth — App.views.more (and any
+// touches a Supabase client directly for auth — App.views.account (and any
 // future caller) only ever sees getUser()/signUp()/signIn()/signOut()/
 // onChange(), so the actual Supabase calls stay swappable and testable
 // behind App.cloud.getClient().
@@ -34,7 +34,7 @@ App.cloud.auth = (function () {
     if (prevId !== nextId) notify();
   }
 
-  // Subscribe to sign-in/sign-out changes (e.g. the More screen re-
+  // Subscribe to sign-in/sign-out changes (e.g. the Account screen re-
   // renders itself). Returns an unsubscribe function.
   function onChange(fn) {
     listeners.push(fn);

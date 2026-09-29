@@ -176,7 +176,7 @@ test('Manual escaping check (real DOM): a malicious exercise name renders as ine
   await App.commands.createExercise(evil);
 
   window.__pwned = false;
-  document.location.hash = '/more';
+  document.location.hash = '/account';
   await wait(30);
 
   assert.equal(window.__pwned, false, 'the payload must never execute');

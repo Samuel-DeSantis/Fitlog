@@ -4,7 +4,7 @@
   App.router.register('/workout', App.views.workout);
   App.router.register('/calendar', App.views.calendar);
   App.router.register('/progress', App.views.progress);
-  App.router.register('/more', App.views.more);
+  App.router.register('/account', App.views.account);
 
   document.querySelectorAll('.nav-tab[data-route]').forEach((tab) => {
     tab.addEventListener('click', () => App.router.go(tab.dataset.route));

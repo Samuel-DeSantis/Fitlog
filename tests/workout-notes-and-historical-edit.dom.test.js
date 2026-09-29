@@ -122,3 +122,29 @@ test('Historical editing: editing a completed workout (sets, exercises, meta, or
   const active = await App.queries.getActiveWorkout();
   assert.equal(active, null, 'no workout should have become active as a side effect of editing history');
 });
+
+test('Workout Notes: inline notes persist, survive finish, and can be edited on a completed workout', async () => {
+  const { document, App } = await bootRealApp();
+  click(document.getElementById('log-workout-btn'));
+  await wait(30);
+  const workoutId = document.location.hash.replace('#/workout/', '');
+
+  assert.match(document.body.textContent, /tell your future coach/);
+  // Typed but committed only via Finish (no separate blur) — must not be lost.
+  const input = document.getElementById('workout-notes-input');
+  input.value = 'Shoulder felt tight on warmup.';
+  click(document.getElementById('finish-workout-btn'));
+  await wait(60);
+
+  let workout = await App.queries.getWorkout(workoutId);
+  assert.equal(workout.status, 'completed');
+  assert.equal(workout.notes, 'Shoulder felt tight on warmup.');
+
+  document.location.hash = '/workout/' + workoutId;
+  await wait(60);
+  setValue(document.getElementById('workout-notes-input'), 'Shoulder fine after warmup.');
+  await wait(30);
+  workout = await App.queries.getWorkout(workoutId);
+  assert.equal(workout.status, 'completed', 'editing notes never reopens the workout');
+  assert.equal(workout.notes, 'Shoulder fine after warmup.');
+});
